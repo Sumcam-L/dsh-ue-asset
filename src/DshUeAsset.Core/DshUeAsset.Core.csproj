@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DshUeAsset.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CUE4Parse" />
+    <PackageReference Include="CUE4Parse-Conversion" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+</Project>

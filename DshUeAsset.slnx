@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/DshUeAsset.Core/DshUeAsset.Core.csproj" />
+  <Project Path="src/DshUeAsset.Cli/DshUeAsset.Cli.csproj" />
+  <Project Path="tests/DshUeAsset.Tests/DshUeAsset.Tests.csproj" />
+</Solution>

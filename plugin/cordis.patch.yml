@@ -1,0 +1,12 @@
+# dsh-ue-asset bundle layer.
+#
+# Mounts the Host half (tools + HTTP API) and the Client half (right-sidebar tab,
+# settings section, tool cards).
+#
+# Optional row config (defaults resolve relative to this package and %LOCALAPPDATA%):
+#   configPath: C:/Users/<you>/AppData/Local/dsh-ue-asset/config.json
+#   exePath:    E:/WorkSpace/Tools/dsh-ue-asset/src/DshUeAsset.Cli/bin/Release/net10.0/ueasset.dll
+#   dotnetPath: dotnet
+- insert:
+    - id: ue-asset
+      name: '@local/dsh-ue-asset'

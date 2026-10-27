@@ -1,0 +1,43 @@
+{
+  "name": "@local/dsh-ue-asset",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness plugin: browse, preview and export Unreal Engine 4/5 assets from local PAK archives through CUE4Parse.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "README.md",
+    "vendor"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "unreal",
+    "ue4",
+    "ue5",
+    "pak",
+    "cue4parse"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

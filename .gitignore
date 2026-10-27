@@ -1,0 +1,10 @@
+bin/
+obj/
+Exports/
+_staging/
+*.user
+node_modules/
+.pnpm-store/
+.ueasset-cache/
+
+dist/
