@@ -136,4 +136,4 @@ npm install dsh-ue-asset
 ```
 
 然后在 DSH profile 的 `package.json` 里把 `dsh-ue-asset` 加入 `dsh.profile.bundles`。
-插件本身只包含 Host/Client，预览依赖同目录的 `ueasset.exe`（可用 `scripts/build-release.ps1` 构建，或放到 `dist/`）。
+`dsh-ue-asset@0.1.2+` 内置 win-x64 的 `ueasset.exe`、`e_sqlite3.dll`、`libSkiaSharp.dll`、`CUE4Parse-Natives.dll`（`dist/`）。Oodle（`oo2core_9_win64.dll`）因 Epic 许可不随包分发，运行时会自动从游戏目录 / `OODLE_DLL` / `oodleLibrary` 查找。
