@@ -28,7 +28,7 @@ window.__ModuleLoader__.load({
         export: '导出',
         queued: '已入队',
         copied: '已复制',
-        settings: '虚幻资产',
+        settings: 'UE资产设置',
         games: '游戏',
         newGame: '+ 新增游戏',
         importFmodel: '从 FModel 导入',
@@ -72,7 +72,7 @@ window.__ModuleLoader__.load({
         export: 'Export',
         queued: 'Queued',
         copied: 'Copied',
-        settings: 'Unreal assets',
+        settings: 'UE asset settings',
         games: 'Games',
         newGame: '+ New game',
         importFmodel: 'Import from FModel',
@@ -1150,6 +1150,7 @@ window.__ModuleLoader__.load({
       const [error, setError] = useState(null)
       const [pakTagsCatalog, setPakTagsCatalog] = useState(null)
       const [tagDrafts, setTagDrafts] = useState({})
+      const [games, setGames] = useState([])
       const { toast, push } = useToasts()
 
       const load = async () => {
@@ -1168,7 +1169,14 @@ window.__ModuleLoader__.load({
         } catch (e) { setError(e.message) }
       }
 
-      useEffect(() => { load() }, [])
+      useEffect(() => {
+        load()
+        // EGame is reflected from the parser on the Host; an older Host without the route simply
+        // leaves the list empty and the field falls back to a free-text input.
+        api('/config/games')
+          .then((result) => setGames((result && result.games) || []))
+          .catch(() => {})
+      }, [])
 
       const loadPakTags = async (profileName) => {
         try {
@@ -1260,13 +1268,38 @@ window.__ModuleLoader__.load({
         h('button', { className: 'ue-btn', onClick: () => setDraft({ ...draft, prefixRules: [...(draft.prefixRules || []), { prefix: '', kind: 'asset' }] }) }, '新增规则')
       )
 
+      const renderGameSelect = () => {
+        if (games.length === 0) {
+          return h('input', { value: draft.game, onChange: (event) => setDraft({ ...draft, game: event.target.value }) })
+        }
+        const groups = []
+        for (const game of games) {
+          let group = groups.find((item) => item.group === game.group)
+          if (!group) { group = { group: game.group, items: [] }; groups.push(group) }
+          group.items.push(game)
+        }
+        const current = draft.game || ''
+        const known = games.some((game) => game.name === current)
+        return h('select', {
+          value: current,
+          onChange: (event) => setDraft({ ...draft, game: event.target.value })
+        },
+          !known && current ? h('option', { key: current, value: current }, current + '  (当前值)') : null,
+          groups.map((group) => h('optgroup', {
+            key: group.group,
+            label: group.group === 'Games' ? t('games') : group.group
+          },
+            group.items.map((game) => h('option', { key: game.name, value: game.name }, game.label + '  ·  ' + game.name))))
+        )
+      }
+
       const renderDraft = () => {
         if (!draft) return null
         return h('div', { className: 'ue-game-body' },
           h('div', { className: 'ue-field' }, h('label', null, t('name')), h('input', { value: draft.name, onChange: (event) => setDraft({ ...draft, name: event.target.value }) })),
           h('div', { className: 'ue-field' }, h('label', null, t('directory')), h('input', { value: draft.directory, onChange: (event) => setDraft({ ...draft, directory: event.target.value }) })),
           h('div', { className: 'ue-field' }, h('label', null, t('extra')), h('textarea', { rows: 2, value: draft.extraDirectories, onChange: (event) => setDraft({ ...draft, extraDirectories: event.target.value }) })),
-          h('div', { className: 'ue-field' }, h('label', null, t('game')), h('input', { value: draft.game, onChange: (event) => setDraft({ ...draft, game: event.target.value }) })),
+          h('div', { className: 'ue-field' }, h('label', null, t('game')), renderGameSelect()),
           h('div', { className: 'ue-field' }, h('label', null, t('platform')),
             h('select', { value: draft.platform, onChange: (event) => setDraft({ ...draft, platform: event.target.value }) },
               ['DesktopMobile', 'XboxAndPlaystation4', 'NintendoSwitch', 'Playstation5'].map((value) => h('option', { key: value, value }, value)))),
@@ -1298,7 +1331,7 @@ window.__ModuleLoader__.load({
 
       return h('div', { className: 'ue-root' },
         h('div', { className: 'ue-section' },
-          h('h4', null, '虚幻资产'),
+          h('h4', null, t('settings')),
           h('div', { className: 'ue-hint' }, '配置文件：' + (config.configPath || '')),
           h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 } },
             h('button', { className: 'ue-btn', onClick: () => { setOriginalName(null); setAesKey(''); setDraft({ name: '', directory: '', extraDirectories: '', game: 'GAME_UE5_0', platform: 'DesktopMobile', usmap: '', aesKey: '', clearAesKey: false, hasAesKey: false, prefixRules: [] }) } }, t('newGame')),

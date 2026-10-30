@@ -93,16 +93,16 @@ powershell -NoProfile -File scripts/install-plugin.ps1 -Apply
 - 类型解析：AssetRegistry 类名 → 游戏前缀表（`uea_asset_types`）→ 内置前缀。
 
 重新启动后，在任意对话里应能看到工具 `uea_open_game` / `uea_tree` / …，
-右栏出现「UE 资产」tab，设置页出现「虚幻资产」分区。
+右栏出现「UE 资产」tab，设置页出现「UE资产设置」分区。
 
 如果用的是 CLI 托管的 profile（非 Electron），也可以直接：
 `dsh plugin --profile <name> add link:E:/WorkSpace/Tools/dsh-ue-asset/plugin`
 
 装好后：
 
-- 8 个工具：`uea_open_game` / `uea_sessions` / `uea_tree` / `uea_find` / `uea_inspect` / `uea_preview` / `uea_export` / `uea_job`
+- 17 个工具：`uea_open_game` / `uea_sessions` / `uea_tree` / `uea_find` / `uea_inspect` / `uea_preview` / `uea_export` / `uea_job` / `uea_paks` / `uea_get_tag` / `uea_set_tag` / `uea_asset` / `uea_index` / `uea_animations` / `uea_asset_types` / `uea_search_assets` / `uea_open_asset`
 - 右侧栏 tab：浏览 / 预览，搜索即输即查
-- 设置 → 虚幻资产：游戏、AES、usmap、Oodle、导出目录
+- 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框
 
 Host 用 `ctx.webServer.register` 暴露 `/ue-asset/api/*` 给 Client；没有依赖未公开的 Remote 装饰器。
 

@@ -551,6 +551,9 @@ public sealed class AssetService : IDisposable
         }
     }
 
+    /// <summary>Selectable values of the parser's EGame enum, reflected so the UI never hard-codes them.</summary>
+    public IReadOnlyList<GameOption> ListGames() => GameCatalog.All();
+
     public ConfigView SaveProfile(ProfileInput input)
     {
         if (string.IsNullOrWhiteSpace(input.Name)) throw AssetException.Invalid("profile name is required");

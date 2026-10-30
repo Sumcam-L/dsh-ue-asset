@@ -94,6 +94,9 @@ public sealed class JsonLineServer
             case "config.get":
                 return _service.GetConfig();
 
+            case "config.games":
+                return new { games = _service.ListGames() };
+
             case "config.saveGlobal":
                 return _service.SaveGlobal(p.ToObject<GlobalInput>() ?? new GlobalInput());
 
