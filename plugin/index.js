@@ -13,7 +13,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-export const name = '@local/dsh-ue-asset'
+export const name = 'dsh-ue-asset'
 export const inject = ['tools', 'webServer']
 
 const API_PREFIX = '/ue-asset/api'
@@ -26,12 +26,19 @@ function defaultConfigPath() {
   return path.join(local, 'dsh-ue-asset', 'config.json')
 }
 
+// The package ships in two shapes and the binaries sit in a different place in each:
+//   flat install (npm / release tarball):  <pkg>/index.js + <pkg>/dist/ueasset.exe
+//   symlinked checkout:                    <repo>/plugin/index.js + <repo>/dist/ueasset.exe
+// Reading only the parent directory worked for the checkout and failed for every real
+// install, so probe both instead of assuming one layout.
+const DIST_ROOTS = [...new Set([path.join(__dirname, 'dist'), path.join(PACKAGE_ROOT, 'dist')])]
+
 function defaultExePath() {
   if (process.env.UEASSET_EXE) return process.env.UEASSET_EXE
   // Newest published exe wins: publishing a new ueasset-<stamp>.exe never collides with
   // the file the currently running serve process holds open.
-  const dist = path.join(PACKAGE_ROOT, 'dist')
-  if (existsSync(dist)) {
+  for (const dist of DIST_ROOTS) {
+    if (!existsSync(dist)) continue
     const candidates = readdirSync(dist)
       .filter((name) => /^ueasset.*\.exe$/i.test(name))
       .map((name) => {

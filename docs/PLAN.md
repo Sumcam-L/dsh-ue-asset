@@ -313,7 +313,7 @@ SessionManager (max 4)
 ```yaml
 - insert:
     - id: ue-asset
-      name: '@local/dsh-ue-asset'
+      name: 'dsh-ue-asset'
       config:
         configPath: C:/Users/Sumcam/AppData/Local/dsh-ue-asset/config.json
         exePath: C:/Users/Sumcam/AppData/Local/dsh-ue-asset/ueasset.exe

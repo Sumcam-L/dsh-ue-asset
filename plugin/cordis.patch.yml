@@ -9,4 +9,4 @@
 #   dotnetPath: dotnet
 - insert:
     - id: ue-asset
-      name: '@local/dsh-ue-asset'
+      name: 'dsh-ue-asset'

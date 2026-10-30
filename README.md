@@ -75,7 +75,23 @@ CLI 每次调用都是独立进程；需要跨命令复用挂载时用 `serve`�
 
 ## DSH 插件
 
-`plugin/` 是一个标准 bundle：Host (`index.js`) + Client (`client.js`)。
+`plugin/` 是一个标准 bundle：Host (`index.js`) + Client (`client.js`)，包名 `dsh-ue-asset`，`package.json` 里声明了 `dsh.bundle` + `dsh.client`，因此可以被 `dsh plugin add` 直接安装（也在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 列表里）。
+
+**装法一：预构建包（推荐，自带 `dist/ueasset.exe`）**
+
+```powershell
+dsh plugin --profile desktop add https://github.com/Sumcam-L/dsh-ue-asset/releases/latest/download/dsh-ue-asset.tgz
+```
+
+**装法二：npm**
+
+```powershell
+dsh plugin --profile desktop add dsh-ue-asset
+```
+
+两种都要把 `"dsh-ue-asset"` 加进 profile `package.json` 的 `dsh.profile.bundles`，然后重启 DSH。
+
+**装法三：源码（本仓库开发时）**
 
 ```powershell
 # 桌面版 DSH 的 profile 由 Electron 独占托管，dsh CLI 会拒绝写入。
@@ -85,6 +101,8 @@ powershell -NoProfile -File scripts/install-plugin.ps1
 # 确认后写入（junction + dependency + bundles），然后重启 DSH：
 powershell -NoProfile -File scripts/install-plugin.ps1 -Apply
 ```
+
+从 git 装（`github:Sumcam-L/dsh-ue-asset#path:/plugin`）只会拿到 `plugin/` 目录本身，没有二进制，需要先 `dotnet publish` 出 `dist/`，或者用 `exePath` 指向已有的 `ueasset.exe`。
 
 新增（P1）：
 
@@ -98,6 +116,8 @@ powershell -NoProfile -File scripts/install-plugin.ps1 -Apply
 
 如果用的是 CLI 托管的 profile（非 Electron），也可以直接：
 `dsh plugin --profile <name> add link:E:/WorkSpace/Tools/dsh-ue-asset/plugin`
+
+包内二进制位置的解析兼容两种布局：平铺安装读 `<包>/dist`，符号链接的检出读仓库根的 `dist`。
 
 装好后：
 
@@ -127,16 +147,15 @@ node scripts/plugin-smoke.mjs b1
 | 不做 | 原因 |
 |---|---|
 | 启动 / 控制 FModel | 解析在 CUE4Parse 库里，不在 WPF 壳里 |
-| 联网下载 keys / mappings / Oodle | 运行时零网络 |
+| 联网下载 keys / mappings | 运行时零网络（唯一例外是设置页里手动点的 Oodle 下载按钮） |
 | 魔改引擎的额外加密 | 只支持标准 AES + usmap |
 | repack / 写回游戏 | 只读 |
 | Unity / Godot / RE | 抽象边界是「虚幻引擎资产」 |
 
-## 安装（npm）
+## 分发
 
-```bash
-npm install dsh-ue-asset
-```
+- npm：[`dsh-ue-asset`](https://www.npmjs.com/package/dsh-ue-asset)（`repository` 指回本仓库）
+- GitHub Release：`dsh-ue-asset.tgz`（文件名不带版本号，`releases/latest/download/` 链接不会因发版失效）
+- 市场条目：`awesome-dsh-plugin` 的 `data/plugins/Sumcam-L__dsh-ue-asset--plugin.yml`
 
-然后在 DSH profile 的 `package.json` 里把 `dsh-ue-asset` 加入 `dsh.profile.bundles`。
-`dsh-ue-asset@0.1.2+` 内置 win-x64 的 `ueasset.exe`、`e_sqlite3.dll`、`libSkiaSharp.dll`、`CUE4Parse-Natives.dll`（`dist/`）。Oodle（`oo2core_9_win64.dll`）因 Epic 许可不随包分发，运行时会自动从游戏目录 / `OODLE_DLL` / `oodleLibrary` 查找；设置页的「下载」按钮可在缺失时从社区镜像补齐（仅下载到本机）。
+`dsh-ue-asset@0.1.3+` 内置 win-x64 的 `ueasset.exe`、`e_sqlite3.dll`、`libSkiaSharp.dll`、`CUE4Parse-Natives.dll`（`dist/`）。Oodle（`oo2core_9_win64.dll`）因 Epic 许可不随包分发，运行时会自动从游戏目录 / `OODLE_DLL` / `oodleLibrary` 查找；设置页的「下载」按钮可在缺失时从社区镜像补齐（仅下载到本机）。

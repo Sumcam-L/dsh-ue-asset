@@ -1,6 +1,6 @@
 {
-  "name": "@local/dsh-ue-asset",
-  "version": "0.1.0",
+  "name": "dsh-ue-asset",
+  "version": "0.1.3",
   "description": "DeepSeek Harness plugin: browse, preview and export Unreal Engine 4/5 assets from local PAK archives through CUE4Parse.",
   "type": "module",
   "main": "index.js",
@@ -17,17 +17,30 @@
     "locale",
     "icon.svg",
     "README.md",
-    "vendor"
+    "screenshots.json",
+    "vendor",
+    "dist"
   ],
   "keywords": [
     "dsh",
     "dsh-plugin",
     "unreal",
+    "unreal-engine",
     "ue4",
     "ue5",
     "pak",
-    "cue4parse"
+    "cue4parse",
+    "modding"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sumcam-L/dsh-ue-asset.git",
+    "directory": "plugin"
+  },
+  "homepage": "https://github.com/Sumcam-L/dsh-ue-asset#readme",
+  "bugs": {
+    "url": "https://github.com/Sumcam-L/dsh-ue-asset/issues"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -39,5 +52,8 @@
   "engines": {
     "node": ">=20"
   },
+  "os": [
+    "win32"
+  ],
   "license": "MIT"
 }

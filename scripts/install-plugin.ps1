@@ -2,9 +2,9 @@
 #
 # The packaged DSH CLI refuses to write such a profile ("managed exclusively by the
 # Electron application"), so this script performs the same three edits by hand:
-#   1. junction <profile>/node_modules/@local/dsh-ue-asset -> <repo>/plugin
-#   2. dependency "@local/dsh-ue-asset": "link:<repo>/plugin"
-#   3. "@local/dsh-ue-asset" in dsh.profile.bundles
+#   1. junction <profile>/node_modules/dsh-ue-asset -> <repo>/plugin
+#   2. dependency "dsh-ue-asset": "link:<repo>/plugin"
+#   3. "dsh-ue-asset" in dsh.profile.bundles
 #
 # Dry run by default. Pass -Apply to write. Restart DSH afterwards.
 [CmdletBinding()]
@@ -19,8 +19,8 @@ $repo = Split-Path -Parent $PSScriptRoot
 $plugin = Join-Path $repo 'plugin'
 $profileDir = Join-Path $env:USERPROFILE ".dsh/profiles/$Profile"
 $packagePath = Join-Path $profileDir 'package.json'
-$linkPath = Join-Path $profileDir 'node_modules/@local/dsh-ue-asset'
-$name = '@local/dsh-ue-asset'
+$linkPath = Join-Path $profileDir 'node_modules/dsh-ue-asset'
+$name = 'dsh-ue-asset'
 $spec = 'link:' + ($plugin -replace '\\', '/')
 
 if (-not (Test-Path $packagePath)) { throw "profile package.json not found: $packagePath" }
