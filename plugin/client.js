@@ -25,6 +25,13 @@ window.__ModuleLoader__.load({
         loading: '加载中…',
         selectHint: '选中一个资产，双击打开预览',
         noPreview: '选择一个资产进行预览',
+        noResults: '没有匹配的资产',
+        treeEmpty: '这个会话里没有可浏览的内容',
+        clearSearch: '清除搜索',
+        copyPath: '复制路径',
+        allTypes: '全部类型',
+        countUnit: '项',
+        filterHint: '输入关键词以按类型筛选',
         export: '导出',
         queued: '已入队',
         copied: '已复制',
@@ -69,6 +76,13 @@ window.__ModuleLoader__.load({
         loading: 'Loading…',
         selectHint: 'Select an asset; double-click to preview',
         noPreview: 'Select an asset to preview',
+        noResults: 'No matching assets',
+        treeEmpty: 'Nothing to browse in this session',
+        clearSearch: 'Clear search',
+        copyPath: 'Copy path',
+        allTypes: 'All types',
+        countUnit: 'items',
+        filterHint: 'Type a query to filter by kind',
         export: 'Export',
         queued: 'Queued',
         copied: 'Copied',
@@ -143,8 +157,15 @@ window.__ModuleLoader__.load({
       .ue-tab { flex:1; padding:5px 8px; border-radius:6px; text-align:center; cursor:pointer; color:var(--dsw-alias-label-secondary); }
       .ue-tab.on { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); font-weight:600; }
       .ue-toolbar { display:flex; gap:6px; padding:6px 8px; border-bottom:1px solid var(--dsw-alias-border-l1); align-items:center; }
-      .ue-search { flex:1; min-width:0; padding:5px 8px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-base); color:inherit; font-size:12px; outline:none; }
+      .ue-searchwrap { position:relative; flex:1; min-width:0; display:flex; align-items:center; }
+      .ue-searchwrap > .ue-search-glyph { position:absolute; left:8px; pointer-events:none; opacity:.5; display:inline-flex; }
+      .ue-search { width:100%; min-width:0; padding:5px 26px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-base); color:inherit; font-size:12px; outline:none; }
       .ue-search:focus { border-color:var(--dsw-alias-brand-primary); }
+      .ue-search-clear { position:absolute; right:4px; width:18px; height:18px; padding:0; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:4px; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; font-size:13px; line-height:1; }
+      .ue-search-clear:hover { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); }
+      .ue-icon-btn { width:24px; height:24px; flex:none; display:inline-flex; align-items:center; justify-content:center; padding:0; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+      .ue-icon-btn:hover { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); }
+      .ue-icon-btn:disabled { opacity:.4; cursor:not-allowed; }
       .ue-select { max-width:120px; padding:4px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:transparent; color:inherit; font-size:11px; }
       .ue-btn { padding:4px 8px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); cursor:pointer; font-size:11px; white-space:nowrap; }
       .ue-btn:hover { border-color:var(--dsw-alias-brand-primary); }
@@ -152,18 +173,31 @@ window.__ModuleLoader__.load({
       .ue-btn.primary { background:var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary)); color:var(--dsw-alias-label-primary-foreground, #fff); border-color:transparent; }
       .ue-btn.primary:hover { filter:brightness(1.08); }
       .ue-btn.danger { color:var(--dsw-alias-state-error-primary); }
-      .ue-scroll { flex:1; overflow:auto; min-height:0; }
-      .ue-row { display:flex; align-items:center; gap:6px; height:32px; padding:0 8px; cursor:default; border-radius:6px; margin:1px 4px; position:relative; }
+      .ue-scroll { flex:1; overflow:auto; min-height:0; padding:2px 0 6px; }
+      .ue-progress { position:relative; height:2px; flex:none; overflow:hidden; }
+      .ue-progress > i { position:absolute; top:0; bottom:0; width:35%; border-radius:2px; background:var(--dsw-alias-brand-primary); animation:ue-slide 1.1s ease-in-out infinite; }
+      @keyframes ue-slide { from { left:-35%; } to { left:100%; } }
+      .ue-row { display:flex; align-items:center; gap:6px; height:30px; padding:0 8px; cursor:default; border-radius:6px; margin:0 4px; position:relative; }
       .ue-row:hover { background:var(--dsw-alias-bg-layer-2); }
-      .ue-row.sel { background:var(--dsw-alias-bg-layer-2); }
-      .ue-row.sel::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px; background:var(--dsw-alias-button-info-fill, #4f8cff); }
+      .ue-row.sel { background:var(--dsw-alias-bg-layer-2); background:color-mix(in srgb, var(--dsw-alias-button-info-fill, #4f8cff) 14%, transparent); }
+      .ue-row.sel::before { content:''; position:absolute; left:0; top:6px; bottom:6px; width:2px; border-radius:2px; background:var(--dsw-alias-button-info-fill, #4f8cff); }
+      .ue-branch { margin-left:10px; border-left:1px solid var(--dsw-alias-border-l1); }
       .ue-type-icon { flex:0 0 14px; display:inline-flex; align-items:center; justify-content:center; opacity:.9; }
-      .ue-caret { flex:0 0 18px; width:18px; text-align:center; color:var(--dsw-alias-label-secondary); cursor:pointer; padding:4px 0; margin:-4px 0; }
-      .ue-sub { color:var(--dsw-alias-label-secondary); font-size:10px; opacity:.75; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:46%; flex:0 1 auto; }
+      .ue-caret { flex:0 0 16px; width:16px; height:100%; display:inline-flex; align-items:center; justify-content:center; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+      .ue-caret:hover { color:var(--dsw-alias-label-primary); }
+      .ue-caret svg { transition:transform .12s ease; }
+      .ue-caret.open svg { transform:rotate(90deg); }
+      .ue-sub { color:var(--dsw-alias-label-secondary); font-size:10px; opacity:.7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:42%; flex:0 1 auto; text-align:right; }
       .ue-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      .ue-size { color:var(--dsw-alias-label-secondary); font-size:11px; }
+      .ue-size { color:var(--dsw-alias-label-secondary); font-size:11px; font-variant-numeric:tabular-nums; min-width:34px; text-align:right; opacity:.85; }
       .ue-dir { color:var(--dsw-alias-label-primary); font-weight:500; }
-      .ue-empty { display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; height:100%; padding:20px; text-align:center; color:var(--dsw-alias-label-secondary); }
+      .ue-footer { display:flex; align-items:center; gap:6px; padding:5px 8px; border-top:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-base); }
+      .ue-footer-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+      .ue-footer-name { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-footer-path { font-size:10px; color:var(--dsw-alias-label-secondary); opacity:.72; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-count { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 10px; font-size:11px; color:var(--dsw-alias-label-secondary); border-top:1px solid var(--dsw-alias-border-l1); }
+      .ue-empty { display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; height:100%; min-height:160px; padding:20px; text-align:center; color:var(--dsw-alias-label-secondary); }
+      .ue-empty svg { opacity:.45; }
       .ue-banner { padding:6px 8px; font-size:11px; color:var(--dsw-alias-state-warn-primary); border-bottom:1px solid var(--dsw-alias-border-l1); }
       .ue-preview { display:flex; flex-direction:column; gap:8px; padding:8px 8px 28px; flex:0 0 auto; }
       .ue-canvas { border-radius:8px; background-color:var(--dsw-alias-bg-layer-2); background-image:linear-gradient(45deg, rgba(128,128,128,.12) 25%, transparent 25%, transparent 75%, rgba(128,128,128,.12) 75%), linear-gradient(45deg, rgba(128,128,128,.12) 25%, transparent 25%, transparent 75%, rgba(128,128,128,.12) 75%); background-size:16px 16px; background-position:0 0,8px 8px; display:flex; align-items:center; justify-content:center; min-height:120px; }
@@ -277,12 +311,13 @@ window.__ModuleLoader__.load({
         onDoubleClick: () => { if (dir) onToggle(node); else onOpen(node); }
       },
         dir
-          ? h('span', { className: 'ue-caret', onClick: (event) => { event.stopPropagation(); onToggle(node); } }, isOpen ? '▾' : '▸')
+          ? h('span', { className: 'ue-caret' + (isOpen ? ' open' : ''), onClick: (event) => { event.stopPropagation(); onToggle(node); } },
+              h('svg', { viewBox: '0 0 24 24', width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }, h('path', { d: 'M9 6l6 6-6 6' })))
           : h('span', { className: 'ue-caret' }, ''),
         h(TypeIcon, { kind: dir ? 'folder' : (node.kind || 'asset') }),
         h('span', { className: 'ue-name' + (dir ? ' ue-dir' : '') }, node.name),
         node.subtitle ? h('span', { className: 'ue-sub' }, node.subtitle) : null,
-        h('span', { className: 'ue-size' }, dir ? String(node.count ?? '') : fmtSize(node.size))
+        h('span', { className: 'ue-size' }, dir ? (node.count ? node.count.toLocaleString() : '') : fmtSize(node.size))
       );
     }
 
@@ -293,10 +328,23 @@ window.__ModuleLoader__.load({
         return h(React.Fragment, { key: node.path },
           h(TreeRow, { node, depth, isOpen: open, selected, onSelect, onOpen, onToggle }),
           node.isDirectory && open && props.childrenOf(node.path)
-            ? h(Tree, { ...props, nodes: props.childrenOf(node.path), depth: depth + 1 })
+            ? h('div', { className: 'ue-branch' }, h(Tree, { ...props, nodes: props.childrenOf(node.path), depth: depth + 1 }))
             : null
         );
       }));
+    }
+
+    const KIND_FILTERS = [
+      ['texture', '贴图'], ['static_mesh', '静态网格'], ['skeletal_mesh', '骨骼网格'],
+      ['skeleton', '骨架'], ['material', '材质'], ['blueprint', '蓝图'],
+      ['anim_sequence', '动画'], ['sound', '音频'], ['data_table', '数据表'],
+      ['data_asset', '数据资产'], ['world', '关卡']
+    ]
+
+    function EmptyGlyph() {
+      return h('svg', { viewBox: '0 0 24 24', width: 28, height: 28, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('path', { d: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' }),
+        h('path', { d: 'M8 13h8' }))
     }
 
     function BrowseTab(props) {
@@ -311,22 +359,27 @@ window.__ModuleLoader__.load({
       const [truncated, setTruncated] = useState(false);
       const [error, setError] = useState(null);
       const [loading, setLoading] = useState(false);
+      const [kind, setKind] = useState('all');
+      const [tick, setTick] = useState(0);
 
       useEffect(() => {
-        setSelected(null); setExpanded(new Set()); setChildren({}); setQuery(''); setResults(null);
+        setSelected(null); setExpanded(new Set()); setChildren({}); setQuery(''); setResults(null); setKind('all');
+      }, [sessionId]);
+
+      useEffect(() => {
         setLoading(true); setError(null);
         api('/tree', { sessionId, path: '', limit: 500 })
           .then((page) => setRoot(page.items || []))
           .catch((e) => setError(e.message))
           .finally(() => setLoading(false));
-      }, [sessionId]);
+      }, [sessionId, tick]);
 
       useEffect(() => {
         if (!query.trim()) { setResults(null); setTruncated(false); setResultTotal(0); return; }
         let cancelled = false;
         const timer = setTimeout(() => {
           setLoading(true);
-          api('/find', { sessionId, query: query.trim(), limit: 200 })
+          api('/find', { sessionId, query: query.trim(), limit: 200, ...(kind === 'all' ? {} : { kind }) })
             .then((page) => {
               if (cancelled) return;
               setResults(page.items || []);
@@ -337,7 +390,7 @@ window.__ModuleLoader__.load({
             .finally(() => { if (!cancelled) setLoading(false); });
         }, 300);
         return () => { cancelled = true; clearTimeout(timer); };
-      }, [query, sessionId]);
+      }, [query, sessionId, kind]);
 
       const loadChildren = useCallback(async (path) => {
         setLoading(true);
@@ -372,43 +425,90 @@ window.__ModuleLoader__.load({
 
       return h('div', { className: 'ue-root', style: { height: '100%' } },
         h('div', { className: 'ue-toolbar' },
-          h('input', {
-            className: 'ue-search',
-            placeholder: t('search'),
-            value: query,
-            onChange: (event) => setQuery(event.target.value)
-          })
+          h('div', { className: 'ue-searchwrap' },
+            h('span', { className: 'ue-search-glyph' },
+              h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' },
+                h('circle', { cx: 11, cy: 11, r: 6 }), h('path', { d: 'M20 20l-3.6-3.6' }))),
+            h('input', {
+              className: 'ue-search',
+              placeholder: t('search'),
+              value: query,
+              onChange: (event) => setQuery(event.target.value),
+              onKeyDown: (event) => {
+                if (event.key === 'Escape') { setQuery(''); return }
+                if (event.key === 'Enter' && results) {
+                  const first = results.find((node) => !node.isDirectory)
+                  if (first) { select(first); onOpenAsset(first.path) }
+                }
+              }
+            }),
+            query ? h('button', { className: 'ue-search-clear', title: t('clearSearch'), onClick: () => setQuery('') }, '×') : null
+          ),
+          h('select', {
+            className: 'ue-select',
+            value: kind,
+            title: '类型筛选',
+            onChange: (event) => setKind(event.target.value)
+          },
+            h('option', { value: 'all' }, t('allTypes')),
+            KIND_FILTERS.map(([value, label]) => h('option', { key: value, value }, label))),
+          h('button', { className: 'ue-icon-btn', title: t('reload'), onClick: () => setTick((value) => value + 1) },
+            h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+              h('path', { d: 'M20 11a8 8 0 1 0-2.34 5.66' }), h('path', { d: 'M20 5v6h-6' })))
         ),
+        loading ? h('div', { className: 'ue-progress' }, h('i')) : null,
         error ? h('div', { className: 'ue-banner' }, error) : null,
         h('div', { className: 'ue-scroll' },
-          results !== null
-            ? (rows.length === 0 && !loading
-                ? h('div', { className: 'ue-empty' }, t('noPreview'))
-                : rows.map((node) => {
-                    const slash = node.path.lastIndexOf('/');
-                    const parent = slash > 0 ? node.path.slice(0, slash) : '';
-                    return h(TreeRow, {
-                      key: node.path,
-                      node: { ...node, subtitle: parent },
-                      depth: 0, isOpen: false, selected, onSelect: select, onOpen: open, onToggle: () => {}
-                    });
-                  }))
-            : h(Tree, {
-                nodes: root,
-                depth: 0,
-                expanded,
-                selected,
-                onSelect: select,
-                onOpen: open,
-                onToggle: toggle,
-                childrenOf
-              })
+          kind !== 'all' && !query.trim()
+            ? h('div', { className: 'ue-empty' }, h(EmptyGlyph), h('div', null, t('filterHint')))
+            : results !== null
+              ? (rows.length === 0 && !loading
+                  ? h('div', { className: 'ue-empty' }, h(EmptyGlyph), h('div', null, t('noResults')),
+                      h('button', { className: 'ue-btn', onClick: () => { setQuery(''); setKind('all') } }, t('clearSearch')))
+                  : rows.map((node) => {
+                      const slash = node.path.lastIndexOf('/');
+                      const parent = slash > 0 ? node.path.slice(0, slash) : '';
+                      return h(TreeRow, {
+                        key: node.path,
+                        node: { ...node, subtitle: parent },
+                        depth: 0, isOpen: false, selected, onSelect: select, onOpen: open, onToggle: () => {}
+                      });
+                    }))
+              : (root.length === 0 && !loading
+                  ? h('div', { className: 'ue-empty' }, h(EmptyGlyph), h('div', null, t('treeEmpty')))
+                  : h(Tree, {
+                      nodes: root,
+                      depth: 0,
+                      expanded,
+                      selected,
+                      onSelect: select,
+                      onOpen: open,
+                      onToggle: toggle,
+                      childrenOf
+                    }))
         ),
-        loading ? h('div', { className: 'ue-jobs' }, t('loading')) : null,
-        truncated ? h('div', { className: 'ue-jobs' }, '共 ' + resultTotal + ' 条，仅显示前 ' + (results ? results.length : 0) + ' 条；请补充关键词') : null,
-        selected ? h('div', { className: 'ue-jobs', style: { justifyContent: 'space-between' } },
-          h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: selected }, selected),
-          h('button', { className: 'ue-btn', onClick: () => { onOpenAsset(selected); } }, t('preview'))
+        results !== null
+          ? h('div', { className: 'ue-count' },
+              h('span', null, (loading ? t('loading') : resultTotal + ' ' + t('countUnit')) + (truncated ? ' · 仅显示前 ' + (results ? results.length : 0) : '')),
+              h('span', null, kind === 'all' ? '' : (KIND_FILTERS.find(([value]) => value === kind) || [])[1]))
+          : null,
+        selected ? h('div', { className: 'ue-footer' },
+          h('div', { className: 'ue-footer-main', title: selected },
+            h('div', { className: 'ue-footer-name' }, selected.slice(selected.lastIndexOf('/') + 1)),
+            h('div', { className: 'ue-footer-path' }, selected)),
+          h('button', {
+            className: 'ue-icon-btn',
+            title: t('copyPath'),
+            onClick: () => {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(selected).then(() => pushToast(t('copied'))).catch(() => {})
+              }
+            }
+          },
+            h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' },
+              h('rect', { x: 9, y: 9, width: 11, height: 11, rx: 2 }), h('path', { d: 'M5 15V6a2 2 0 0 1 2-2h9' }))),
+          h('button', { className: 'ue-btn', title: t('close'), onClick: () => setSelected(null) }, '×'),
+          h('button', { className: 'ue-btn primary', onClick: () => onOpenAsset(selected) }, t('preview'))
         ) : null
       );
     }
