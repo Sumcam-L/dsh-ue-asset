@@ -97,6 +97,9 @@ public sealed class JsonLineServer
             case "config.games":
                 return new { games = _service.ListGames() };
 
+            case "profile.icon":
+                return _service.ProfileIcon(Required(p, "profile"));
+
             case "config.saveGlobal":
                 return _service.SaveGlobal(p.ToObject<GlobalInput>() ?? new GlobalInput());
 

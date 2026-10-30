@@ -728,6 +728,7 @@ function registerRoutes(ctx, cli) {
   route('POST', '/config/delete', 'config.deleteProfile')
   route('POST', '/config/import', 'config.importFmodel')
   route('GET', '/config/games', 'config.games')
+  route('POST', '/profile-icon', 'profile.icon')
   route('POST', '/open', 'open')
   route('GET', '/sessions', 'sessions')
   route('POST', '/tree', 'tree')

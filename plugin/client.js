@@ -195,6 +195,8 @@ window.__ModuleLoader__.load({
       .ue-game > summary:focus { outline:none; }
       .ue-game[open] > summary::after { content:''; position:absolute; left:0; top:9px; bottom:9px; width:2px; border-radius:2px; background:var(--dsw-alias-button-info-fill, #4f8cff); }
       .ue-game > summary::-webkit-details-marker { display:none; }
+      .ue-game-icon { width:20px; height:20px; border-radius:5px; object-fit:contain; flex:none; background:rgba(128,128,128,.14); }
+      .ue-game-icon.placeholder { display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:var(--dsw-alias-label-secondary); text-transform:uppercase; }
       .ue-game > summary:before { content:'▸'; color:var(--dsw-alias-label-secondary); }
       .ue-game[open] > summary:before { content:'▾'; }
       .ue-game-body { padding:0 10px 10px; }
@@ -1141,6 +1143,12 @@ window.__ModuleLoader__.load({
       )
     }
 
+    function GameBadge(props) {
+      if (props.src) return h('img', { className: 'ue-game-icon', src: props.src, alt: '' })
+      const initial = String(props.name || '?').trim().charAt(0).toUpperCase()
+      return h('span', { className: 'ue-game-icon placeholder' }, initial)
+    }
+
     function SettingsSection() {
       const [config, setConfig] = useState(null)
       const [global, setGlobal] = useState(null)
@@ -1151,12 +1159,26 @@ window.__ModuleLoader__.load({
       const [pakTagsCatalog, setPakTagsCatalog] = useState(null)
       const [tagDrafts, setTagDrafts] = useState({})
       const [games, setGames] = useState([])
+      const [icons, setIcons] = useState({})
       const { toast, push } = useToasts()
+
+      const loadIcons = async (profiles) => {
+        const entries = await Promise.all((profiles || []).map(async (profile) => {
+          try {
+            const result = await api('/profile-icon', { profile: profile.name })
+            return [profile.name, result && result.icon ? 'data:image/png;base64,' + result.icon : null]
+          } catch {
+            return [profile.name, null]
+          }
+        }))
+        setIcons(Object.fromEntries(entries))
+      }
 
       const load = async () => {
         try {
           const cfg = await api('/config')
           setConfig(cfg)
+          loadIcons(cfg.profiles)
           setGlobal({
             outputRoot: cfg.outputRoot || '',
             cacheRoot: cfg.cacheRoot || '',
@@ -1345,7 +1367,7 @@ window.__ModuleLoader__.load({
               else if (!event.target.open && originalName === profile.name) { setDraft(null); setOriginalName(null) }
             }
           },
-            h('summary', null, profile.name + '  ' + (profile.hasAesKey ? '🔑' : '')),
+            h('summary', null, h(GameBadge, { name: profile.name, src: icons[profile.name] }), profile.name),
             originalName === profile.name ? renderDraft() : null
           )),
           draft && originalName === null ? h('details', { className: 'ue-game', open: true }, h('summary', null, t('newGame')), renderDraft()) : null

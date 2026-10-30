@@ -102,7 +102,7 @@ powershell -NoProfile -File scripts/install-plugin.ps1 -Apply
 
 - 17 个工具：`uea_open_game` / `uea_sessions` / `uea_tree` / `uea_find` / `uea_inspect` / `uea_preview` / `uea_export` / `uea_job` / `uea_paks` / `uea_get_tag` / `uea_set_tag` / `uea_asset` / `uea_index` / `uea_animations` / `uea_asset_types` / `uea_search_assets` / `uea_open_asset`
 - 右侧栏 tab：浏览 / 预览，搜索即输即查
-- 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框
+- 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框，游戏卡片前缀显示从游戏 exe 资源提取的图标
 
 Host 用 `ctx.webServer.register` 暴露 `/ue-asset/api/*` 给 Client；没有依赖未公开的 Remote 装饰器。
 

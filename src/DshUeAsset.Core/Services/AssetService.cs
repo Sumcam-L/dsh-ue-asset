@@ -554,6 +554,28 @@ public sealed class AssetService : IDisposable
     /// <summary>Selectable values of the parser's EGame enum, reflected so the UI never hard-codes them.</summary>
     public IReadOnlyList<GameOption> ListGames() => GameCatalog.All();
 
+    /// <summary>
+    /// Icon of the game executable (PNG, base64) for the settings cards. A missing executable or icon
+    /// returns null so the UI keeps its own placeholder instead of failing the request.
+    /// </summary>
+    public object ProfileIcon(string profileName)
+    {
+        GameProfile profile;
+        lock (_configLock)
+        {
+            if (!Config.Profiles.TryGetValue(profileName, out var found))
+                throw AssetException.NotFound($"profile not found: {profileName}");
+            profile = found.Clone();
+        }
+
+        var (exe, png) = GameIcon.Resolve(profile);
+        return new
+        {
+            icon = png is null ? null : Convert.ToBase64String(png),
+            exe
+        };
+    }
+
     public ConfigView SaveProfile(ProfileInput input)
     {
         if (string.IsNullOrWhiteSpace(input.Name)) throw AssetException.Invalid("profile name is required");
