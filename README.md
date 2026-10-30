@@ -9,6 +9,16 @@ CUE4Parse (NuGet)  ──►  DshUeAsset.Core  ──►  ueasset CLI / serve
                                               └── DSH Client 插件（右栏 tab / 设置页 / 卡片）
 ```
 
+## 截图
+
+<img src="plugin/assets/screenshot-1.png" width="240"> <img src="plugin/assets/screenshot-2.png" width="240"> <img src="plugin/assets/screenshot-3.png" width="240">
+
+模型预览（`SK_Wukong.uasset` → GLB 91.3 MB，贴图与骨架都在）· 按 chunk 挂载 PAK · 路径搜索 + 类型筛选
+
+<img src="plugin/assets/screenshot-4.png" width="240"> <img src="plugin/assets/screenshot-5.png" width="240"> <img src="plugin/assets/screenshot-6.png" width="240">
+
+目录树（层级引导线 + 每级计数）· 选择游戏（图标取自游戏 exe）· 设置页（引擎版本枚举 / PAK 标签 / AES）
+
 ## 当前状态
 
 本机（.NET SDK 10.0.101 + CUE4Parse 1.2.2.202610 + 黑神话：悟空）已实测：

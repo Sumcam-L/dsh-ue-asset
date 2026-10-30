@@ -8,6 +8,8 @@ Unreal Engine 4/5 cooked assets straight out of local PAK archives (CUE4Parse).
 - **Client** (`client.js`): right-sidebar browser/preview tab, settings section, job bar,
   and native tool cards for every `uea_*` call.
 
+<img src="assets/screenshot-1.png" width="220"> <img src="assets/screenshot-3.png" width="220"> <img src="assets/screenshot-6.png" width="220">
+
 ## Install
 
 Prebuilt bundle (recommended — it carries `dist/ueasset.exe`):
