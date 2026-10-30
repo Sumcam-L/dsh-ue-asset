@@ -102,7 +102,9 @@ powershell -NoProfile -File scripts/install-plugin.ps1 -Apply
 装好后：
 
 - 17 个工具：`uea_open_game` / `uea_sessions` / `uea_tree` / `uea_find` / `uea_inspect` / `uea_preview` / `uea_export` / `uea_job` / `uea_paks` / `uea_get_tag` / `uea_set_tag` / `uea_asset` / `uea_index` / `uea_animations` / `uea_asset_types` / `uea_search_assets` / `uea_open_asset`
-- 右侧栏 tab：浏览 / 预览，搜索即输即查
+- 右侧栏 tab：浏览 / 预览，搜索即输即查，可按资产类型筛选
+- 加载包界面：游戏卡片带 exe 图标，会话列表可直接继续或关闭（关闭走 `/close`，正在导出的会话会被拒绝）；PAK 列表支持筛选、chunk 徽章、全选 / 清空 / 默认和一行统计
+- 预览界面顶部常驻「重载 / 复制路径 / 导出」，切换资产会重置内容与滚动位置；没有位图预览的资产显示属性 JSON 并保留重试入口
 - 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框，游戏卡片前缀显示从游戏 exe 资源提取的图标；Oodle 一栏的「下载」按钮会先找本机副本（游戏目录 / FModel / exe 同目录），找不到再下载
 
 Host 用 `ctx.webServer.register` 暴露 `/ue-asset/api/*` 给 Client；没有依赖未公开的 Remote 装饰器。

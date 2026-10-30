@@ -32,6 +32,15 @@ window.__ModuleLoader__.load({
         allTypes: '全部类型',
         countUnit: '项',
         filterHint: '输入关键词以按类型筛选',
+        reload: '重载',
+        retry: '重试',
+        closeSession: '关闭会话',
+        chooseGame: '选择游戏',
+        filterPaks: '筛选 PAK…',
+        back: '返回',
+        sessionClosed: '会话已关闭',
+        refresh: '刷新',
+        noProfiles: '还没有游戏，先在设置里添加',
         export: '导出',
         queued: '已入队',
         copied: '已复制',
@@ -83,6 +92,15 @@ window.__ModuleLoader__.load({
         allTypes: 'All types',
         countUnit: 'items',
         filterHint: 'Type a query to filter by kind',
+        reload: 'Reload',
+        retry: 'Retry',
+        closeSession: 'Close session',
+        chooseGame: 'Choose a game',
+        filterPaks: 'Filter PAKs…',
+        back: 'Back',
+        sessionClosed: 'Session closed',
+        refresh: 'Refresh',
+        noProfiles: 'No games yet; add one in settings.',
         export: 'Export',
         queued: 'Queued',
         copied: 'Copied',
@@ -210,6 +228,35 @@ window.__ModuleLoader__.load({
       .ue-anim { display:flex; gap:6px; align-items:center; margin-top:6px; }
       .ue-anim input { flex:1; min-width:0; padding:5px 7px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-base); color:var(--dsw-alias-label-primary); font-size:12px; }
       .ue-pre { margin:0; padding:8px; background:var(--dsw-alias-bg-layer-2); border-radius:8px; font-size:11px; line-height:1.45; overflow:auto; max-height:320px; white-space:pre-wrap; word-break:break-all; }
+      .ue-pp { display:flex; flex-direction:column; flex:1; min-height:0; }
+      .ue-pp-head { display:flex; align-items:center; gap:6px; padding:6px 8px; border-bottom:1px solid var(--dsw-alias-border-l1); flex:none; }
+      .ue-pp-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+      .ue-pp-title { font-size:11px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-pp-path { font-size:10px; color:var(--dsw-alias-label-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-pp-meta { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+      .ue-skel { display:flex; flex-direction:column; gap:8px; padding:10px; }
+      .ue-skel i { display:block; height:10px; border-radius:5px; background:linear-gradient(90deg, var(--dsw-alias-bg-layer-2) 25%, var(--dsw-alias-bg-layer-1) 37%, var(--dsw-alias-bg-layer-2) 63%); background-size:400% 100%; animation:ue-shimmer 1.4s ease infinite; }
+      @keyframes ue-shimmer { 0% { background-position:100% 0; } 100% { background-position:-100% 0; } }
+      .ue-games { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
+      .ue-game-card { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--dsw-alias-border-l1); border-radius:10px; background:var(--dsw-alias-bg-layer-1); cursor:pointer; min-width:0; }
+      .ue-game-card:hover { border-color:var(--dsw-alias-brand-primary); }
+      .ue-game-card.on { border-color:var(--dsw-alias-brand-primary); background:color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent); }
+      .ue-game-card-body { min-width:0; flex:1; display:flex; flex-direction:column; gap:1px; }
+      .ue-game-card-name { font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-game-card-sub { font-size:10px; color:var(--dsw-alias-label-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-lp { display:flex; flex-direction:column; flex:1; min-height:0; }
+      .ue-lp-head { display:flex; align-items:center; gap:6px; padding:8px 8px 6px; flex:none; font-size:11px; color:var(--dsw-alias-label-secondary); }
+      .ue-lp-title { flex:1; min-width:0; font-weight:600; color:var(--dsw-alias-label-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-lp-body { flex:1; min-height:0; overflow:auto; padding:0 8px 8px; }
+      .ue-lp-sec { font-size:10px; color:var(--dsw-alias-label-secondary); margin:4px 0 6px; letter-spacing:.04em; }
+      .ue-sess { display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--dsw-alias-border-l1); border-radius:8px; margin-bottom:6px; background:var(--dsw-alias-bg-layer-1); }
+      .ue-pak-filter { width:100%; padding:4px 8px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:transparent; color:inherit; font-size:11px; margin-bottom:6px; box-sizing:border-box; }
+      .ue-pak { display:flex; align-items:center; gap:6px; padding:3px 4px; border-radius:6px; font-size:11px; cursor:pointer; }
+      .ue-pak:hover { background:var(--dsw-alias-bg-layer-2); }
+      .ue-pak-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-chip { font-size:9px; padding:1px 5px; border-radius:999px; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-secondary); flex:none; }
+      .ue-lp-foot { display:flex; align-items:center; gap:6px; padding:6px 8px; border-top:1px solid var(--dsw-alias-border-l1); flex:none; }
+      .ue-lp-foot .ue-grow { flex:1; min-width:0; font-size:10px; color:var(--dsw-alias-label-secondary); font-variant-numeric:tabular-nums; }
       .ue-section { padding:10px 12px; border-bottom:1px solid var(--dsw-alias-border-l1); }
       .ue-section h4 { margin:0 0 8px; font-size:12px; font-weight:600; }
       .ue-field { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
@@ -345,6 +392,21 @@ window.__ModuleLoader__.load({
       return h('svg', { viewBox: '0 0 24 24', width: 28, height: 28, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round' },
         h('path', { d: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' }),
         h('path', { d: 'M8 13h8' }))
+    }
+
+    function IconRefresh(props) {
+      return h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('path', { d: 'M20 11a8 8 0 1 0-2.34 5.66' }), h('path', { d: 'M20 5v6h-6' }))
+    }
+
+    function IconCopy(props) {
+      return h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('rect', { x: 9, y: 9, width: 11, height: 11, rx: 2 }), h('path', { d: 'M5 15V5a2 2 0 0 1 2-2h10' }))
+    }
+
+    function IconClose(props) {
+      return h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('path', { d: 'M6 6l12 12' }), h('path', { d: 'M18 6L6 18' }))
     }
 
     function BrowseTab(props) {
@@ -1002,7 +1064,7 @@ window.__ModuleLoader__.load({
         return value;
       };
 
-      const loadPreview = async (animPath) => {
+      const runPreview = useCallback(async (animPath) => {
         setLoading(true); setError(null); setAnimationHint(null);
         try {
           const resolved = await resolveAnimation(animPath);
@@ -1010,15 +1072,19 @@ window.__ModuleLoader__.load({
           if (resolved) body.animationPath = resolved;
           const result = await api('/preview', body);
           setData(result);
-        } catch (e) { setError(e.message); }
+        } catch (e) { setError((e && e.message) || String(e)); }
         finally { setLoading(false); }
-      };
+      }, [sessionId, path]);
 
       useEffect(() => {
-        if (!path) { setData(null); return; }
-        setAnimationPath('');
-        loadPreview('');
-      }, [sessionId, path]);
+        setData(null); setError(null); setLoading(false); setAnimationPath('');
+        setAnimationChoices([]); setAnimationOptions([]); setAnimationHint(null); setPickerOpen(false);
+        if (path) runPreview('');
+      }, [runPreview, path]);
+
+      const copyPath = async () => {
+        try { await navigator.clipboard.writeText(path || ''); pushToast(t('copied')); } catch {}
+      };
 
       useEffect(() => {
         if (!path || !data || data.kind !== 'mesh') { setAnimationOptions([]); return; }
@@ -1036,16 +1102,14 @@ window.__ModuleLoader__.load({
         } catch (e) { pushToast(e.message); }
       };
 
-      if (!path) return h('div', { className: 'ue-empty' }, t('noPreview'));
-      if (error) return h('div', { className: 'ue-banner' }, '无法预览：' + error);
-      if (loading && !data) return h('div', { className: 'ue-empty' }, t('loading'));
-
       const image = data && data.mime && data.base64
         ? h('img', { src: 'data:' + data.mime + ';base64,' + data.base64, alt: data.objectPath })
         : null;
       const meta = data && (data.meta || {});
       const mesh = data && data.kind === 'mesh' && meta.modelUrl ? meta : null;
       const json = data && !image && !mesh ? JSON.stringify(meta, null, 2) : null;
+      const fullName = (data && data.objectPath) || path || '';
+      const shortName = fullName ? fullName.slice(fullName.lastIndexOf('/') + 1) : '';
       const body = mesh
         ? h('div', null,
             h(MeshViewer, { key: mesh.modelUrl + (mesh.animation?.url || ''), url: mesh.modelUrl, animationUrl: mesh.animation && mesh.animation.url, materials: mesh.materialBindings || [], materialsOmitted: mesh.materials === false }),
@@ -1053,46 +1117,64 @@ window.__ModuleLoader__.load({
           )
         : h('div', { className: 'ue-canvas' }, image || h('span', { className: 'ue-meta' }, data ? data.className || '' : ''));
 
-      return h('div', { className: 'ue-preview' },
-        animationOptions.length > 0
-          ? h('div', { className: 'ue-anim' },
-              h('select', { className: 'ue-select', style: { flex: 1, minWidth: 0 }, onChange: (event) => { const value = event.target.value; if (value) { setAnimationPath(value); loadPreview(value); } } },
-                h('option', { value: '' }, '选择该网格的动画（' + animationOptions.length + '）'),
-                animationOptions.map((item) => h('option', { key: item.path, value: item.path }, item.name))))
-          : null,
-        h('div', { className: 'ue-anim' },
-          h('input', { value: animationPath, placeholder: '完整路径（.uasset）或动画目录（末尾 /）', onChange: (event) => setAnimationPath(event.target.value) }),
-          h('button', { className: 'ue-btn', onClick: () => loadPreview(animationPath) }, '加载动画'),
-          h('button', { className: 'ue-btn', onClick: () => setPickerOpen(true) }, '从目录选择')
+      return h('div', { className: 'ue-pp' },
+        h('div', { className: 'ue-pp-head' },
+          path ? h(TypeIcon, { kind: (data && data.kind) || 'asset' }) : null,
+          h('div', { className: 'ue-pp-info' },
+            h('div', { className: 'ue-pp-title', title: fullName }, shortName || t('preview')),
+            h('div', { className: 'ue-pp-path', title: path || '' }, path || '')),
+          path ? h('button', { className: 'ue-icon-btn', title: t('reload'), disabled: loading, onClick: () => runPreview(animationPath) }, h(IconRefresh)) : null,
+          path ? h('button', { className: 'ue-icon-btn', title: t('copyPath'), onClick: copyPath }, h(IconCopy)) : null,
+          path ? h('button', { className: 'ue-btn primary', disabled: loading, onClick: exportOne }, t('export')) : null
         ),
-        animationHint ? h('div', { className: 'ue-hint' }, animationHint) : null,
-        animationChoices.length > 0
-          ? h('div', { className: 'ue-anim' },
-              h('select', { className: 'ue-select', onChange: (event) => { const value = event.target.value; if (value) { setAnimationPath(value); loadPreview(value); } } },
-                h('option', { value: '' }, '选择该目录下的动画…'),
-                animationChoices.map((item) => h('option', { key: item.path, value: item.path }, item.name))))
-          : null,
-        pickerOpen
-          ? h(AnimationPicker, {
-              sessionId,
-              initialPath: (path || '').split('/').slice(0, -1).join('/'),
-              onPick: (selected) => { setPickerOpen(false); setAnimationPath(selected); loadPreview(selected); },
-              onClose: () => setPickerOpen(false)
-            })
-          : null,
-        body,
-        h('div', { className: 'ue-name', style: { fontWeight: 600 } }, data ? (data.objectPath || path).split('/').pop() : path),
-        h('div', { className: 'ue-meta' },
-          '[' + (data && data.className || '?') + ']',
-          data && data.width ? '  ' + data.width + '×' + data.height : '',
-          '  ' + (data && data.kind || '')
-        ),
-        data && data.note ? h('div', { className: 'ue-hint' }, data.note) : null,
-        mesh && mesh.animationError ? h('div', { className: 'ue-banner' }, mesh.animationError) : null,
-        json ? h('pre', { className: 'ue-pre' }, json) : null,
-        h('div', { style: { display: 'flex', gap: 6 } },
-          h('button', { className: 'ue-btn primary', onClick: exportOne }, t('export')),
-          h('button', { className: 'ue-btn', onClick: async () => { try { await navigator.clipboard.writeText(path); pushToast(t('copied')); } catch {} } }, '复制路径')
+        loading ? h('div', { className: 'ue-progress' }, h('i')) : null,
+        error ? h('div', { className: 'ue-banner' }, t('preview') + '失败：' + error,
+          h('button', { className: 'ue-btn', style: { marginLeft: 8 }, onClick: () => runPreview(animationPath) }, t('retry'))) : null,
+        !path
+          ? h('div', { className: 'ue-empty' }, h(EmptyGlyph), h('div', null, t('noPreview')))
+          : (loading && !data
+              ? h('div', { className: 'ue-skel' },
+                  h('i', { style: { width: '66%' } }), h('i', { style: { width: '92%' } }), h('i', { style: { width: '48%' } }))
+              : (!data
+                  ? h('div', { className: 'ue-empty' }, h(EmptyGlyph), h('div', null, error ? '预览失败' : t('noPreview')))
+                  : h('div', { className: 'ue-scroll' },
+                  h('div', { className: 'ue-preview' },
+                    data && data.kind === 'mesh'
+                      ? h(React.Fragment, null,
+                          animationOptions.length > 0
+                            ? h('select', { className: 'ue-select', style: { maxWidth: '100%', width: '100%' }, value: '', onChange: (event) => { const value = event.target.value; if (value) { setAnimationPath(value); runPreview(value); } } },
+                                h('option', { value: '' }, '选择该网格的动画（' + animationOptions.length + '）'),
+                                animationOptions.map((item) => h('option', { key: item.path, value: item.path }, item.name)))
+                            : null,
+                          h('div', { className: 'ue-anim' },
+                            h('input', { value: animationPath, placeholder: '动画路径（.uasset）或目录（末尾 /）', onChange: (event) => setAnimationPath(event.target.value), onKeyDown: (event) => { if (event.key === 'Enter') runPreview(animationPath); } }),
+                            h('button', { className: 'ue-btn', onClick: () => runPreview(animationPath) }, '加载'),
+                            h('button', { className: 'ue-btn', onClick: () => setPickerOpen(true) }, '目录'))
+                        )
+                      : null,
+                    animationHint ? h('div', { className: 'ue-hint' }, animationHint) : null,
+                    animationChoices.length > 0
+                      ? h('select', { className: 'ue-select', style: { maxWidth: '100%', width: '100%' }, onChange: (event) => { const value = event.target.value; if (value) { setAnimationPath(value); runPreview(value); } } },
+                          h('option', { value: '' }, '选择该目录下的动画…'),
+                          animationChoices.map((item) => h('option', { key: item.path, value: item.path }, item.name)))
+                      : null,
+                    pickerOpen
+                      ? h(AnimationPicker, {
+                          sessionId,
+                          initialPath: (path || '').split('/').slice(0, -1).join('/'),
+                          onPick: (selected) => { setPickerOpen(false); setAnimationPath(selected); runPreview(selected); },
+                          onClose: () => setPickerOpen(false)
+                        })
+                      : null,
+                    body,
+                    h('div', { className: 'ue-pp-meta' },
+                      h('span', { className: 'ue-chip' }, '[' + ((data && data.className) || '?') + ']'),
+                      data && data.kind ? h('span', { className: 'ue-chip' }, data.kind) : null,
+                      data && data.width ? h('span', { className: 'ue-chip' }, data.width + '×' + data.height) : null),
+                    data && data.note ? h('div', { className: 'ue-hint' }, data.note) : null,
+                    mesh && mesh.animationError ? h('div', { className: 'ue-banner' }, mesh.animationError) : null,
+                    json ? h('pre', { className: 'ue-pre' }, json) : null
+                  )))
         )
       );
     }
@@ -1109,6 +1191,10 @@ window.__ModuleLoader__.load({
       const [pakCatalog, setPakCatalog] = useState(null)
       const [selectedPaks, setSelectedPaks] = useState([])
       const [activeProfile, setActiveProfile] = useState(null)
+      const [pakQuery, setPakQuery] = useState('')
+      const [icons, setIcons] = useState({})
+      const [closing, setClosing] = useState(null)
+      const previewPaneRef = useRef(null)
       const { toast, push } = useToasts()
 
       const refresh = useCallback(async () => {
@@ -1143,8 +1229,25 @@ window.__ModuleLoader__.load({
         return () => clearInterval(timer)
       }, [refresh])
 
+      const profileNames = config && config.profiles ? config.profiles.map((profile) => profile.name).join('|') : ''
+      useEffect(() => {
+        if (!config) return
+        let cancelled = false
+        Promise.all((config.profiles || []).map(async (profile) => {
+          try {
+            const result = await api('/profile-icon', { profile: profile.name })
+            return [profile.name, result && result.icon ? 'data:image/png;base64,' + result.icon : null]
+          } catch { return [profile.name, null] }
+        })).then((entries) => { if (!cancelled) setIcons(Object.fromEntries(entries)) })
+        return () => { cancelled = true }
+      }, [profileNames])
+
+      useEffect(() => {
+        if (previewPaneRef.current) previewPaneRef.current.scrollTop = 0
+      }, [previewPath, sessionId, tab])
+
       const loadPaks = async (profile) => {
-        setActiveProfile(profile); setError(null)
+        setActiveProfile(profile); setError(null); setPakQuery('')
         try {
           const catalog = await api('/paks', { profile })
           setPakCatalog(catalog)
@@ -1154,6 +1257,21 @@ window.__ModuleLoader__.load({
           setSelectedPaks(defaults)
         } catch (e) { setError(e.message) }
       }
+
+      const closeSession = async (id) => {
+        if (!id) return
+        setClosing(id); setError(null)
+        try {
+          await api('/close', { sessionId: id })
+          setSessions((prev) => prev.filter((session) => session.sessionId !== id))
+          if (sessionId === id) { setSessionId(null); setPreviewPath(null); setTab('browse') }
+          await refresh()
+          push(t('sessionClosed'))
+        } catch (e) { setError(e.message) }
+        finally { setClosing(null) }
+      }
+
+      const tailDir = (value) => String(value || '').split(/[\\/]/).filter(Boolean).slice(-2).join('/')
 
       const openProfile = async (profile, paks) => {
         setOpening(true); setError(null)
@@ -1171,53 +1289,81 @@ window.__ModuleLoader__.load({
       const togglePak = (name) => setSelectedPaks((prev) => prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name])
       const current = sessions.find((session) => session.sessionId === sessionId) || null
 
-      const body = !sessionId
-        ? h('div', { className: 'ue-empty', style: { alignItems: 'stretch', justifyContent: 'flex-start', overflow: 'auto' } },
-            h('div', null, t('empty')),
-            h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' } },
-              (config ? config.profiles : []).map((profile) => h('button', {
-                key: profile.name,
-                className: 'ue-btn' + (activeProfile === profile.name ? ' primary' : ''),
-                onClick: () => loadPaks(profile.name)
-              }, profile.name))
+      const profiles = (config && config.profiles) || []
+      const defaultsFor = (catalog) => {
+        if (!catalog) return []
+        const list = catalog.defaults && catalog.defaults.length > 0 ? catalog.defaults : catalog.available.filter((pak) => pak.chunk === 0).map((pak) => pak.name)
+        return list.length > 0 ? list : catalog.available.slice(0, 1).map((pak) => pak.name)
+      }
+      const filteredPaks = pakCatalog
+        ? pakCatalog.available.filter((pak) => !pakQuery.trim() || pak.name.toLowerCase().includes(pakQuery.trim().toLowerCase()))
+        : []
+
+      const loadBody = pakCatalog
+        ? h('div', { className: 'ue-lp' },
+            h('div', { className: 'ue-lp-head' },
+              h(GameBadge, { src: icons[activeProfile], name: activeProfile }),
+              h('div', { className: 'ue-lp-title', title: activeProfile }, activeProfile + ' · ' + tailDir(pakCatalog.paksDirectory)),
+              h('button', { className: 'ue-btn', onClick: () => { setPakCatalog(null); setActiveProfile(null); setPakQuery('') } }, t('back'))
             ),
-            sessions.length > 0
-              ? h('div', { style: { textAlign: 'center' } },
-                  h('div', { className: 'ue-hint' }, '已有会话'),
-                  sessions.map((item) => h('button', {
-                    key: item.sessionId,
-                    className: 'ue-btn',
-                    style: { margin: 3 },
-                    onClick: () => setSessionId(item.sessionId)
-                  }, item.profile + ' · ' + item.mounted + '/' + (item.mounted + item.missing))))
-              : null,
-            pakCatalog
-              ? h('div', { style: { textAlign: 'left' } },
-                  h('div', { className: 'ue-hint', style: { margin: '6px 0' } }, '选择要挂载的 PAK（chunk0 会自动补入）'),
-                  h('div', { style: { maxHeight: 220, overflow: 'auto', border: '1px solid var(--dsw-alias-border-l1)', borderRadius: 8, padding: 4 } },
-                    pakCatalog.available.map((pak) => h('label', {
-                      key: pak.name,
-                      style: { display: 'flex', gap: 6, alignItems: 'center', padding: '3px 4px', fontSize: 11 }
-                    },
-                      h('input', { type: 'checkbox', checked: selectedPaks.includes(pak.name), onChange: () => togglePak(pak.name) }),
-                      h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: pak.name }, pak.name),
-                      h('span', { className: 'ue-meta' }, (pak.tags || []).join(','))
-                    ))
-                  ),
-                  h('div', { style: { display: 'flex', gap: 6, marginTop: 8 } },
-                    h('button', { className: 'ue-btn primary', disabled: selectedPaks.length === 0 || opening, onClick: () => openProfile(activeProfile, selectedPaks) }, opening ? t('loading') : '打开选中 (' + selectedPaks.length + ')'),
-                    h('button', { className: 'ue-btn', onClick: () => setSelectedPaks(pakCatalog.available.map((pak) => pak.name)) }, '全选'),
-                    h('button', { className: 'ue-btn', onClick: () => setSelectedPaks([]) }, '清空')
-                  )
-                )
-              : h('div', { className: 'ue-hint' }, '先选一个游戏，再选择 PAK')
+            h('div', { className: 'ue-lp-body' },
+              h('input', { className: 'ue-pak-filter', value: pakQuery, placeholder: t('filterPaks'), onChange: (event) => setPakQuery(event.target.value), onKeyDown: (event) => { if (event.key === 'Escape') setPakQuery('') } }),
+              filteredPaks.map((pak) => h('label', { key: pak.name, className: 'ue-pak', title: pak.name },
+                h('input', { type: 'checkbox', checked: selectedPaks.includes(pak.name), onChange: () => togglePak(pak.name) }),
+                h('span', { className: 'ue-pak-name' }, pak.name.replace(/^pakchunk/, 'chunk').replace(/\.(pak|utoc|ucas)$/i, '')),
+                h('span', { className: 'ue-chip' }, 'c' + pak.chunk),
+                (pak.tags || []).length > 0 ? h('span', { className: 'ue-chip' }, pak.tags.join(',')) : null)),
+              filteredPaks.length === 0 ? h('div', { className: 'ue-hint' }, t('noResults')) : null
+            ),
+            h('div', { className: 'ue-lp-foot' },
+              h('span', { className: 'ue-grow' }, selectedPaks.length + ' / ' + pakCatalog.available.length),
+              h('button', { className: 'ue-btn', onClick: () => setSelectedPaks(pakCatalog.available.map((pak) => pak.name)) }, '全选'),
+              h('button', { className: 'ue-btn', onClick: () => setSelectedPaks([]) }, '清空'),
+              h('button', { className: 'ue-btn', onClick: () => setSelectedPaks(defaultsFor(pakCatalog)) }, '默认'),
+              h('button', { className: 'ue-btn primary', disabled: selectedPaks.length === 0 || opening, onClick: () => openProfile(activeProfile, selectedPaks) }, opening ? t('loading') : '打开 (' + selectedPaks.length + ')')
+            )
           )
+        : h('div', { className: 'ue-lp' },
+            h('div', { className: 'ue-lp-head' },
+              h('div', { className: 'ue-lp-title' }, t('chooseGame')),
+              h('button', { className: 'ue-icon-btn', title: t('refresh'), onClick: () => refresh() }, h(IconRefresh))),
+            h('div', { className: 'ue-lp-body' },
+              sessions.length > 0
+                ? h(React.Fragment, null,
+                    h('div', { className: 'ue-lp-sec' }, '已挂载的会话'),
+                    sessions.map((item) => h('div', { key: item.sessionId, className: 'ue-sess' },
+                      h(GameBadge, { src: icons[item.profile], name: item.profile }),
+                      h('div', { className: 'ue-game-card-body' },
+                        h('div', { className: 'ue-game-card-name' }, item.profile || item.sessionId),
+                        h('div', { className: 'ue-game-card-sub' }, 'PAK ' + item.mounted + '/' + (item.mounted + item.missing) + (item.needsKey ? ' · 缺少 ' + item.missing + ' 个密钥' : ''))),
+                      h('button', { className: 'ue-btn', onClick: () => setSessionId(item.sessionId) }, '继续'),
+                      h('button', { className: 'ue-icon-btn', title: t('closeSession'), disabled: closing === item.sessionId, onClick: () => closeSession(item.sessionId) }, h(IconClose)))))
+                : null,
+              h('div', { className: 'ue-lp-sec' }, '选择游戏'),
+              profiles.length === 0
+                ? h('div', { className: 'ue-hint' }, t('noProfiles'))
+                : h('div', { className: 'ue-games' },
+                    profiles.map((profile) => h('div', {
+                      key: profile.name,
+                      className: 'ue-game-card' + (activeProfile === profile.name ? ' on' : ''),
+                      title: (profile.game ? profile.game + '\n' : '') + (profile.directory || ''),
+                      onClick: () => loadPaks(profile.name)
+                    },
+                      h(GameBadge, { src: icons[profile.name], name: profile.name }),
+                      h('div', { className: 'ue-game-card-body' },
+                        h('div', { className: 'ue-game-card-name' }, profile.name),
+                        h('div', { className: 'ue-game-card-sub' }, tailDir(profile.directory) || profile.game || '')))))
+            )
+          )
+
+      const body = !sessionId
+        ? loadBody
         : h(React.Fragment, null,
             current && current.needsKey ? h('div', { className: 'ue-banner' }, t('needsKey') + ' (' + current.missing + ')') : null,
             h('div', { className: 'ue-pane', hidden: tab !== 'browse' },
               h(BrowseTab, { sessionId, pushToast: push, onOpenAsset: (path) => { setPreviewPath(path); setTab('preview') } })),
-            h('div', { className: 'ue-pane', hidden: tab !== 'preview' },
-              h(PreviewTab, { sessionId, path: previewPath, pushToast: push }))
+            h('div', { className: 'ue-pane', ref: previewPaneRef, hidden: tab !== 'preview' },
+              h(PreviewTab, { key: (sessionId || '') + '|' + (previewPath || ''), sessionId, path: previewPath, pushToast: push }))
           )
 
       return h('div', { className: 'ue-root' },
@@ -1236,6 +1382,13 @@ window.__ModuleLoader__.load({
               (session.profile || session.sessionId) + ' · ' + session.mounted + '/' + (session.mounted + session.missing)))
           ),
           current ? h('span', { className: 'ue-status ' + (current.needsKey ? 'warn' : 'ok') }) : null,
+          current ? h('button', {
+            className: 'ue-icon-btn',
+            title: t('closeSession'),
+            disabled: closing === current.sessionId,
+            onClick: () => closeSession(current.sessionId)
+          }, h(IconClose)) : null,
+          h('button', { className: 'ue-icon-btn', title: t('refresh'), onClick: () => refresh() }, h(IconRefresh)),
           error ? h('span', { className: 'ue-hint', title: error }, '!') : null
         ),
         body,

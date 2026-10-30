@@ -732,6 +732,7 @@ function registerRoutes(ctx, cli) {
   route('POST', '/oodle/download', 'oodle.acquire')
   route('POST', '/open', 'open')
   route('GET', '/sessions', 'sessions')
+  route('POST', '/close', 'close')
   route('POST', '/tree', 'tree')
   route('POST', '/find', 'find')
   route('POST', '/search-assets', 'searchAssets')
