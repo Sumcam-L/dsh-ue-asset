@@ -1160,6 +1160,7 @@ window.__ModuleLoader__.load({
       const [tagDrafts, setTagDrafts] = useState({})
       const [games, setGames] = useState([])
       const [icons, setIcons] = useState({})
+      const [oodleBusy, setOodleBusy] = useState(false)
       const { toast, push } = useToasts()
 
       const loadIcons = async (profiles) => {
@@ -1270,6 +1271,15 @@ window.__ModuleLoader__.load({
         } catch (e) { setError(e.message) }
       }
 
+      const acquireOodle = async () => {
+        setOodleBusy(true)
+        try {
+          const result = await api('/oodle/download', {})
+          setGlobal((prev) => (prev ? { ...prev, oodleLibrary: result.path } : prev))
+          push(result.method === 'download' ? '已下载 Oodle 到 ' + result.path : '已使用本机 Oodle：' + result.path)
+        } catch (e) { setError(e.message) } finally { setOodleBusy(false) }
+      }
+
       const saveGlobal = async () => {
         try {
           const cfg = await api('/config/global', global)
@@ -1376,7 +1386,11 @@ window.__ModuleLoader__.load({
           h('h4', null, t('global')),
           h('div', { className: 'ue-field' }, h('label', null, t('outputRoot')), h('input', { value: global.outputRoot, onChange: (event) => setGlobal({ ...global, outputRoot: event.target.value }) })),
           h('div', { className: 'ue-field' }, h('label', null, '缓存 / 索引目录'), h('input', { value: global.cacheRoot, placeholder: '留空使用默认目录', onChange: (event) => setGlobal({ ...global, cacheRoot: event.target.value }) })),
-          h('div', { className: 'ue-field' }, h('label', null, t('oodle')), h('input', { value: global.oodleLibrary, placeholder: '留空自动查找', onChange: (event) => setGlobal({ ...global, oodleLibrary: event.target.value }) })),
+          h('div', { className: 'ue-field' }, h('label', null, t('oodle')),
+            h('div', { style: { display: 'flex', gap: '6px' } },
+              h('input', { style: { flex: '1' }, value: global.oodleLibrary, placeholder: '留空自动查找', onChange: (event) => setGlobal({ ...global, oodleLibrary: event.target.value }) }),
+              h('button', { className: 'ue-btn', disabled: oodleBusy, title: 'Oodle 为 Epic 专有组件：优先使用本机副本，找不到才从公开社区镜像下载', onClick: acquireOodle }, oodleBusy ? '下载中…' : '下载')
+            )),
           h('div', { className: 'ue-field' }, h('label', null, t('meshFormat')),
             h('select', { value: global.defaultMeshFormat, onChange: (event) => setGlobal({ ...global, defaultMeshFormat: event.target.value }) },
               ['UEFormat', 'Gltf2', 'ActorX'].map((value) => h('option', { key: value, value }, value)))),

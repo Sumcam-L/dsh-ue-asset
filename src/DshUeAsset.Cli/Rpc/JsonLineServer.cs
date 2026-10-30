@@ -100,6 +100,9 @@ public sealed class JsonLineServer
             case "profile.icon":
                 return _service.ProfileIcon(Required(p, "profile"));
 
+            case "oodle.acquire":
+                return await _service.AcquireOodleAsync(Optional(p, "profile")).ConfigureAwait(false);
+
             case "config.saveGlobal":
                 return _service.SaveGlobal(p.ToObject<GlobalInput>() ?? new GlobalInput());
 

@@ -729,6 +729,7 @@ function registerRoutes(ctx, cli) {
   route('POST', '/config/import', 'config.importFmodel')
   route('GET', '/config/games', 'config.games')
   route('POST', '/profile-icon', 'profile.icon')
+  route('POST', '/oodle/download', 'oodle.acquire')
   route('POST', '/open', 'open')
   route('GET', '/sessions', 'sessions')
   route('POST', '/tree', 'tree')

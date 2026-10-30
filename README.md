@@ -36,7 +36,8 @@ dotnet build src/DshUeAsset.Cli/DshUeAsset.Cli.csproj -c Release
 dotnet src/DshUeAsset.Cli/bin/Release/net10.0/ueasset.dll config import-fmodel
 
 # 3. 补齐 Oodle（解压加密/压缩 PAK 必需）
-#    编辑 %LOCALAPPDATA%\dsh-ue-asset\config.json → "oodleLibrary"
+#    设置 → UE资产设置 → Oodle 旁的「下载」按钮：优先用本机副本，找不到才从公开镜像下载；
+#    也可以手动编辑 %LOCALAPPDATA%\dsh-ue-asset\config.json → "oodleLibrary"
 
 # 4. 挂载 + 搜索 + 预览
 ueasset open b1
@@ -102,7 +103,7 @@ powershell -NoProfile -File scripts/install-plugin.ps1 -Apply
 
 - 17 个工具：`uea_open_game` / `uea_sessions` / `uea_tree` / `uea_find` / `uea_inspect` / `uea_preview` / `uea_export` / `uea_job` / `uea_paks` / `uea_get_tag` / `uea_set_tag` / `uea_asset` / `uea_index` / `uea_animations` / `uea_asset_types` / `uea_search_assets` / `uea_open_asset`
 - 右侧栏 tab：浏览 / 预览，搜索即输即查
-- 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框，游戏卡片前缀显示从游戏 exe 资源提取的图标
+- 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框，游戏卡片前缀显示从游戏 exe 资源提取的图标；Oodle 一栏的「下载」按钮会先找本机副本（游戏目录 / FModel / exe 同目录），找不到再下载
 
 Host 用 `ctx.webServer.register` 暴露 `/ue-asset/api/*` 给 Client；没有依赖未公开的 Remote 装饰器。
 
@@ -136,4 +137,4 @@ npm install dsh-ue-asset
 ```
 
 然后在 DSH profile 的 `package.json` 里把 `dsh-ue-asset` 加入 `dsh.profile.bundles`。
-`dsh-ue-asset@0.1.2+` 内置 win-x64 的 `ueasset.exe`、`e_sqlite3.dll`、`libSkiaSharp.dll`、`CUE4Parse-Natives.dll`（`dist/`）。Oodle（`oo2core_9_win64.dll`）因 Epic 许可不随包分发，运行时会自动从游戏目录 / `OODLE_DLL` / `oodleLibrary` 查找。
+`dsh-ue-asset@0.1.2+` 内置 win-x64 的 `ueasset.exe`、`e_sqlite3.dll`、`libSkiaSharp.dll`、`CUE4Parse-Natives.dll`（`dist/`）。Oodle（`oo2core_9_win64.dll`）因 Epic 许可不随包分发，运行时会自动从游戏目录 / `OODLE_DLL` / `oodleLibrary` 查找；设置页的「下载」按钮可在缺失时从社区镜像补齐（仅下载到本机）。

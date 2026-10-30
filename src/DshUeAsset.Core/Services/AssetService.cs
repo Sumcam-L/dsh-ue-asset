@@ -576,6 +576,36 @@ public sealed class AssetService : IDisposable
         };
     }
 
+    /// <summary>
+    /// Resolves the Oodle runtime for the settings button. A local copy (game folder, FModel, next to
+    /// the executable) always wins; the community mirror is downloaded only when nothing is found, and
+    /// the resolved path is persisted so the next launch reuses it.
+    /// </summary>
+    public async Task<object> AcquireOodleAsync(string? profileName, CancellationToken cancellationToken = default)
+    {
+        GameProfile? profile;
+        string? configured;
+        lock (_configLock)
+        {
+            configured = Config.OodleLibrary;
+            profile = !string.IsNullOrWhiteSpace(profileName) && Config.Profiles.TryGetValue(profileName!, out var named)
+                ? named.Clone()
+                : Config.Profiles.Values.Select(item => item.Clone()).FirstOrDefault();
+        }
+
+        var (path, method) = await DshUeAsset.Core.Sessions.OodleAcquirer
+            .AcquireAsync(profile, configured, AppContext.BaseDirectory, cancellationToken)
+            .ConfigureAwait(false);
+
+        lock (_configLock)
+        {
+            Config.OodleLibrary = path;
+            SaveConfigLocked();
+        }
+
+        return new { path, method };
+    }
+
     public ConfigView SaveProfile(ProfileInput input)
     {
         if (string.IsNullOrWhiteSpace(input.Name)) throw AssetException.Invalid("profile name is required");
