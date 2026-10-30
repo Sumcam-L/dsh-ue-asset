@@ -20,6 +20,9 @@ public static class AssetQuery
         var prefix = NormalizeDirectory(path);
         var dirCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var files = new List<TreeEntry>();
+        // FileProviderDictionary enumerates the same virtual path once per archive that ships it
+        // (chunk overrides), which used to show duplicate rows for one asset.
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Iterate key/value pairs directly: FileProviderDictionary.TryGetValue cannot be trusted
         // to resolve every key it just enumerated (duplicate archive entries / payload keys),
@@ -27,6 +30,7 @@ public static class AssetQuery
         foreach (var pair in provider.Files)
         {
             var key = pair.Key;
+            if (!seen.Add(key)) continue;
             if (prefix.Length > 0 && !key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
             var rest = key[prefix.Length..];
             if (rest.Length == 0) continue;
@@ -81,9 +85,11 @@ public static class AssetQuery
         var ext = string.IsNullOrWhiteSpace(extension) ? null : (extension.StartsWith('.') ? extension : "." + extension);
 
         var matched = new List<TreeEntry>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in provider.Files)
         {
             var key = pair.Key;
+            if (!seen.Add(key)) continue;
             if (pre.Length > 0 && !key.StartsWith(pre, StringComparison.OrdinalIgnoreCase)) continue;
 
             var fileExt = Path.GetExtension(key);
@@ -111,6 +117,64 @@ public static class AssetQuery
         var page = matched.Skip(offset).Take(limit).ToList();
         var next = offset + page.Count < total ? offset + page.Count : (int?)null;
         return new PageResult<TreeEntry>(page, total, offset, next);
+    }
+
+    /// <summary>
+    /// One pass over the provider restricted to a handful of candidate directories. Used by the
+    /// animation picker, which used to call <see cref="Find"/> once per candidate directory and
+    /// therefore scanned the whole archive five times.
+    /// </summary>
+    public static IReadOnlyList<TreeEntry> FindInDirectories(
+        IFileProvider provider,
+        string? query,
+        IReadOnlyList<string> directories,
+        string extension,
+        int limit,
+        string? kind,
+        GameProfile? profile)
+    {
+        limit = Math.Clamp(limit, 1, 2000);
+        var q = (query ?? "").Trim();
+        var ext = extension.StartsWith('.') ? extension : "." + extension;
+        var bounds = directories
+            .Select(static d => d.Replace('\\', '/').TrimEnd('/'))
+            .Where(static d => d.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var matched = new List<TreeEntry>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in provider.Files)
+        {
+            var key = pair.Key;
+            if (!seen.Add(key)) continue;
+            if (!key.EndsWith(ext, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var inside = false;
+            foreach (var bound in bounds)
+            {
+                if (key.Length > bound.Length
+                    && key.StartsWith(bound, StringComparison.OrdinalIgnoreCase)
+                    && key[bound.Length] == '/')
+                {
+                    inside = true;
+                    break;
+                }
+            }
+            if (!inside) continue;
+
+            var fileName = Path.GetFileName(key);
+            if (q.Length > 0 && fileName.IndexOf(q, StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+            var assetKind = AssetKind.Resolve(provider, profile, key, fileName, ext);
+            if (!string.IsNullOrWhiteSpace(kind) && !assetKind.Equals(kind, StringComparison.OrdinalIgnoreCase)) continue;
+
+            matched.Add(new TreeEntry(fileName, key, false, pair.Value.Size, ext, null, assetKind));
+            if (matched.Count >= limit * 8) break;
+        }
+
+        matched.Sort(static (a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
+        return matched.Count > limit ? matched.GetRange(0, limit) : matched;
     }
 
     public static bool Exists(IFileProvider provider, string virtualPath) => provider.Files.ContainsKey(virtualPath);

@@ -23,6 +23,8 @@ window.__ModuleLoader__.load({
         continueLast: '继续上次',
         choose: '选择…',
         loading: '加载中…',
+        searching: '搜索中…',
+        preparing: '导出预览中…',
         selectHint: '选中一个资产，双击打开预览',
         noPreview: '选择一个资产进行预览',
         noResults: '没有匹配的资产',
@@ -83,6 +85,8 @@ window.__ModuleLoader__.load({
         continueLast: 'Continue',
         choose: 'Choose…',
         loading: 'Loading…',
+        searching: 'Searching…',
+        preparing: 'Building preview…',
         selectHint: 'Select an asset; double-click to preview',
         noPreview: 'Select an asset to preview',
         noResults: 'No matching assets',
@@ -236,6 +240,8 @@ window.__ModuleLoader__.load({
       .ue-pp-meta { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
       .ue-skel { display:flex; flex-direction:column; gap:8px; padding:10px; }
       .ue-skel i { display:block; height:10px; border-radius:5px; background:linear-gradient(90deg, var(--dsw-alias-bg-layer-2) 25%, var(--dsw-alias-bg-layer-1) 37%, var(--dsw-alias-bg-layer-2) 63%); background-size:400% 100%; animation:ue-shimmer 1.4s ease infinite; }
+      .ue-skel-label { margin-top:2px; font-size:11px; color:var(--dsw-alias-label-secondary); font-variant-numeric:tabular-nums; }
+      .ue-stale { opacity:.45; transition:opacity .12s; pointer-events:none; }
       @keyframes ue-shimmer { 0% { background-position:100% 0; } 100% { background-position:-100% 0; } }
       .ue-games { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
       .ue-game-card { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--dsw-alias-border-l1); border-radius:10px; background:var(--dsw-alias-bg-layer-1); cursor:pointer; min-width:0; }
@@ -418,6 +424,7 @@ window.__ModuleLoader__.load({
       const [query, setQuery] = useState('');
       const [results, setResults] = useState(null);
       const [resultTotal, setResultTotal] = useState(0);
+      const [searched, setSearched] = useState({ query: '', kind: 'all' });
       const [truncated, setTruncated] = useState(false);
       const [error, setError] = useState(null);
       const [loading, setLoading] = useState(false);
@@ -437,7 +444,7 @@ window.__ModuleLoader__.load({
       }, [sessionId, tick]);
 
       useEffect(() => {
-        if (!query.trim()) { setResults(null); setTruncated(false); setResultTotal(0); return; }
+        if (!query.trim()) { setResults(null); setTruncated(false); setResultTotal(0); setSearched({ query: '', kind }); return; }
         let cancelled = false;
         const timer = setTimeout(() => {
           setLoading(true);
@@ -447,6 +454,7 @@ window.__ModuleLoader__.load({
               setResults(page.items || []);
               setResultTotal(page.total || 0);
               setTruncated(page.nextOffset != null);
+              setSearched({ query: query.trim(), kind });
             })
             .catch((e) => { if (!cancelled) setError(e.message); })
             .finally(() => { if (!cancelled) setLoading(false); });
@@ -476,6 +484,9 @@ window.__ModuleLoader__.load({
         if (!children[node.path]) loadChildren(node.path);
       }, [children, loadChildren]);
 
+      // Results shown belong to an older query/filter while a new one is in flight — dim them
+      // instead of silently presenting a mix the user never asked for.
+      const staleResults = results !== null && (searched.query !== query.trim() || searched.kind !== kind);
       const rows = results !== null ? results : root;
       const childrenOf = (path) => children[path];
       const select = (node) => setSelected(node.path);
@@ -520,7 +531,7 @@ window.__ModuleLoader__.load({
         ),
         loading ? h('div', { className: 'ue-progress' }, h('i')) : null,
         error ? h('div', { className: 'ue-banner' }, error) : null,
-        h('div', { className: 'ue-scroll' },
+        h('div', { className: 'ue-scroll' + (staleResults ? ' ue-stale' : '') },
           kind !== 'all' && !query.trim()
             ? h('div', { className: 'ue-empty' }, h(EmptyGlyph), h('div', null, t('filterHint')))
             : results !== null
@@ -551,7 +562,7 @@ window.__ModuleLoader__.load({
         ),
         results !== null
           ? h('div', { className: 'ue-count' },
-              h('span', null, (loading ? t('loading') : resultTotal + ' ' + t('countUnit')) + (truncated ? ' · 仅显示前 ' + (results ? results.length : 0) : '')),
+              h('span', null, (staleResults ? t('searching') : (resultTotal + ' ' + t('countUnit'))) + (truncated && !staleResults ? ' · 仅显示前 ' + (results ? results.length : 0) : '')),
               h('span', null, kind === 'all' ? '' : (KIND_FILTERS.find(([value]) => value === kind) || [])[1]))
           : null,
         selected ? h('div', { className: 'ue-footer' },
@@ -1047,6 +1058,7 @@ window.__ModuleLoader__.load({
       const [animationHint, setAnimationHint] = useState(null);
       const [animationOptions, setAnimationOptions] = useState([]);
       const [pickerOpen, setPickerOpen] = useState(false);
+      const [elapsed, setElapsed] = useState(0);
 
       const resolveAnimation = async (raw) => {
         const value = String(raw || '').trim();
@@ -1075,6 +1087,15 @@ window.__ModuleLoader__.load({
         } catch (e) { setError((e && e.message) || String(e)); }
         finally { setLoading(false); }
       }, [sessionId, path]);
+
+      // A cold mesh export takes a second or two; show how long the user has been waiting
+      // instead of an anonymous pulsing bar.
+      useEffect(() => {
+        if (!loading) { setElapsed(0); return undefined }
+        const started = Date.now();
+        const timer = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000);
+        return () => clearInterval(timer);
+      }, [loading]);
 
       useEffect(() => {
         setData(null); setError(null); setLoading(false); setAnimationPath('');
@@ -1134,7 +1155,8 @@ window.__ModuleLoader__.load({
           ? h('div', { className: 'ue-empty' }, h(EmptyGlyph), h('div', null, t('noPreview')))
           : (loading && !data
               ? h('div', { className: 'ue-skel' },
-                  h('i', { style: { width: '66%' } }), h('i', { style: { width: '92%' } }), h('i', { style: { width: '48%' } }))
+                  h('i', { style: { width: '66%' } }), h('i', { style: { width: '92%' } }), h('i', { style: { width: '48%' } }),
+                  h('div', { className: 'ue-skel-label' }, t('preparing') + (elapsed > 0 ? ' ' + elapsed + 's' : '')))
               : (!data
                   ? h('div', { className: 'ue-empty' }, h(EmptyGlyph), h('div', null, error ? '预览失败' : t('noPreview')))
                   : h('div', { className: 'ue-scroll' },

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using CUE4Parse.FileProvider;
 using DshUeAsset.Core.Assets;
 using DshUeAsset.Core.Config;
@@ -18,6 +19,8 @@ public sealed class AssetService : IDisposable
 {
     private readonly ConfigStore _store;
     private readonly object _configLock = new();
+    // Animation discovery is a full archive scan per mesh; the sidebar asks again on every reopen.
+    private readonly ConcurrentDictionary<string, IReadOnlyList<TreeEntry>> _animationCache = new(StringComparer.OrdinalIgnoreCase);
 
     public AssetService(ConfigStore? store = null)
     {
@@ -100,6 +103,16 @@ public sealed class AssetService : IDisposable
         }
 
         var session = await Task.Run(() => Sessions.Open(profile, selection), cancellationToken).ConfigureAwait(false);
+
+        // AssetRegistry.bin is parsed lazily on the first type lookup (~5s for a 340k-asset game).
+        // Warm it now so the first tree/search request after mounting stays fast.
+        var warmProvider = session.Provider;
+        _ = Task.Run(() =>
+        {
+            try { AssetRegistryCache.GetStatus(warmProvider); }
+            catch { /* warm-up only */ }
+        }, CancellationToken.None);
+
         lock (_configLock)
         {
             Config.UiState.LastProfile = profile.Name;
@@ -112,19 +125,27 @@ public sealed class AssetService : IDisposable
     public void Close(string sessionId)
     {
         Sessions.Close(sessionId);
+        foreach (var key in _animationCache.Keys)
+        {
+            if (key.StartsWith(sessionId + "|", StringComparison.OrdinalIgnoreCase)) _animationCache.TryRemove(key, out _);
+        }
         lock (_configLock) SaveConfigLocked();
     }
 
     public Task<PageResult<TreeEntry>> BrowseAsync(string sessionId, string? path, int limit, int offset, CancellationToken ct = default)
     {
         var session = Sessions.Get(sessionId);
-        return WithGateAsync(session, () => AssetQuery.Browse(session.Provider, path, limit, offset, session.Profile), ct);
+        // Path enumeration only touches the already-mounted file dictionary; taking the session
+        // gate here serialised browsing behind a running mesh export (the sidebar froze).
+        session.Touch();
+        return Task.Run(() => AssetQuery.Browse(session.Provider, path, limit, offset, session.Profile), ct);
     }
 
     public Task<PageResult<TreeEntry>> FindAsync(string sessionId, string query, string? prefix, string? extension, int limit, int offset, bool includeNonAssets, string? kind = null, bool nameOnly = false, CancellationToken ct = default)
     {
         var session = Sessions.Get(sessionId);
-        return WithGateAsync(session, () => AssetQuery.Find(session.Provider, query, prefix, extension, limit, offset, includeNonAssets, kind, nameOnly, session.Profile), ct);
+        session.Touch();
+        return Task.Run(() => AssetQuery.Find(session.Provider, query, prefix, extension, limit, offset, includeNonAssets, kind, nameOnly, session.Profile), ct);
     }
 
     public object GetAssetTypes(string profile, string? sessionId)
@@ -173,6 +194,8 @@ public sealed class AssetService : IDisposable
         var provider = session.Provider;
         var results = new Dictionary<string, TreeEntry>(StringComparer.OrdinalIgnoreCase);
         var max = Math.Clamp(limit, 1, 200);
+        var cacheKey = sessionId + "|" + meshPath + "|" + (prefix ?? "") + "|" + (query ?? "") + "|" + max;
+        if (_animationCache.TryGetValue(cacheKey, out var cached)) return cached;
 
         var directories = new List<string>();
         if (!string.IsNullOrWhiteSpace(prefix)) directories.Add(prefix!.TrimEnd('/'));
@@ -196,19 +219,8 @@ public sealed class AssetService : IDisposable
             if (segments.Length >= 4) directories.Add(string.Join('/', segments.Take(3)) + "/Animation");
         }
 
-        foreach (var directory in directories.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            try
-            {
-                var page = AssetQuery.Find(provider, "AS_", directory, ".uasset", max, 0, false, "anim_sequence", true, session.Profile);
-                foreach (var entry in page.Items) results[entry.Path] = entry;
-            }
-            catch
-            {
-                // prefix may not exist
-            }
-            if (results.Count >= max) break;
-        }
+        foreach (var entry in AssetQuery.FindInDirectories(provider, "AS_", directories, ".uasset", max, "anim_sequence", session.Profile))
+            results[entry.Path] = entry;
 
         if (results.Count == 0)
         {
@@ -237,10 +249,12 @@ public sealed class AssetService : IDisposable
             }
         }
 
-        return results.Values
+        var list = results.Values
             .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
             .Take(max)
             .ToList();
+        if (list.Count > 0) _animationCache[cacheKey] = list;
+        return list;
     }
 
     public SearchResult SearchAssets(string sessionId, string query, string? kind, int limit)
