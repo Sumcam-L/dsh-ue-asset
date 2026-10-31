@@ -22,14 +22,18 @@ public static class ProviderFactory
     private static readonly object OodleLock = new();
     private static string? _loadedOodle;
 
-    public static (IFileProvider Provider, MountReport Report) Create(GameProfile profile, string? oodleLibrary, IReadOnlyList<PakInfo>? selection = null)
+    /// <summary>
+    /// Build a provider with nothing registered and nothing mounted. Key inspection needs exactly
+    /// this: RegisterVfs only reads a pak footer and its index header, while Initialize() would
+    /// scan and register every archive in the directory.
+    /// </summary>
+    public static DefaultFileProvider CreateProvider(GameProfile profile, string? oodleLibrary, List<string> warnings)
     {
         if (string.IsNullOrWhiteSpace(profile.Directory))
             throw AssetException.Invalid("profile.directory is empty");
         if (!Directory.Exists(profile.Directory))
             throw AssetException.NotFound($"paks directory does not exist: {profile.Directory}", new { profile.Directory });
 
-        var warnings = new List<string>();
         InitializeOodle(profile, oodleLibrary, warnings);
 
         var game = ParseEnum<EGame>(profile.Game, "game");
@@ -56,6 +60,21 @@ public static class ProviderFactory
             else
                 warnings.Add($"usmap not found: {profile.Usmap}");
         }
+
+        return provider;
+    }
+
+    /// <summary>Post-mount wiring, shared by the initial mount and by a late AES key.</summary>
+    public static void AfterMount(AbstractVfsFileProvider provider)
+    {
+        provider.PostMount();
+        RegisterPluginVirtualPaths(provider);
+    }
+
+    public static (IFileProvider Provider, MountReport Report) Create(GameProfile profile, string? oodleLibrary, IReadOnlyList<PakInfo>? selection = null)
+    {
+        var warnings = new List<string>();
+        var provider = CreateProvider(profile, oodleLibrary, warnings);
 
         if (selection is { Count: > 0 })
         {
@@ -100,8 +119,7 @@ public static class ProviderFactory
         // SubmitKey itself mounts every reader whose GUID it covers, so Mount() returning 0
         // is normal on the happy path. The real success signal is MountedVfs.
         var newMounts = provider.Mount();
-        provider.PostMount();
-        RegisterPluginVirtualPaths(provider);
+        AfterMount(provider);
         var mounted = provider.MountedVfs.Count;
 
         // Missing keys never abort a mount that produced usable archives: the panel shows a
@@ -205,7 +223,7 @@ public static class ProviderFactory
         return parsed;
     }
 
-    private static string CleanKey(string key)
+    internal static string CleanKey(string key)
     {
         var value = key.Trim();
         return value.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? value[2..] : value;

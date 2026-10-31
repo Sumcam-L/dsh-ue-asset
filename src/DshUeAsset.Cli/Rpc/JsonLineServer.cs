@@ -188,6 +188,15 @@ public sealed class JsonLineServer
                     Required(p, "pak"),
                     p["tags"]?.ToObject<string[]>() ?? []);
 
+            case "pakKeys":
+                return _service.ListPakKeys(Required(p, "profile"));
+
+            case "bindPakKey":
+                return _service.BindPakKey(
+                    Required(p, "profile"),
+                    Required(p, "pak"),
+                    Required(p, "key"));
+
             case "close":
                 _service.Close(Required(p, "sessionId"));
                 return new { closed = true };

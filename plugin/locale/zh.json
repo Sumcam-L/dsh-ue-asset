@@ -33,7 +33,7 @@
   "oodle": "Oodle DLL",
   "meshFormat": "网格格式",
   "sessions": "会话上限",
-  "needsKey": "部分归档缺少 AES 密钥，已挂载部分仍可浏览",
+  "needsKey": "部分归档缺少 AES 密钥，可关闭会话后在 PAK 列表点锁图标补密钥",
   "jobRunning": "导出中",
   "details": "属性",
   "size": "大小",

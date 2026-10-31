@@ -8,3 +8,6 @@ node_modules/
 .ueasset-cache/
 
 dist/
+
+# Local reference checkouts (CUE4Parse source)
+.refs/

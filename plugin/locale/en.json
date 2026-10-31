@@ -33,7 +33,7 @@
   "oodle": "Oodle DLL",
   "meshFormat": "Mesh format",
   "sessions": "Session limit",
-  "needsKey": "Some archives need AES keys; the mounted part stays browsable",
+  "needsKey": "Some archives need AES keys — close the session and click the lock in the PAK list",
   "jobRunning": "Exporting",
   "details": "Properties",
   "size": "Size",

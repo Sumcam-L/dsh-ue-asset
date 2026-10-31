@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
+using CUE4Parse.Encryption.Aes;
 using CUE4Parse.FileProvider;
+using CUE4Parse.FileProvider.Vfs;
+using CUE4Parse.UE4.Objects.Core.Misc;
 using DshUeAsset.Core.Assets;
 using DshUeAsset.Core.Config;
 using DshUeAsset.Core.Export;
@@ -13,6 +16,9 @@ using Newtonsoft.Json.Linq;
 namespace DshUeAsset.Core.Services;
 
 public sealed record OpenRequest(string? Profile, string? Directory, string? Game, string? AesKey, string? Usmap, IReadOnlyList<string>? Paks = null, IReadOnlyList<string>? Tags = null);
+
+/// <summary>Result of attaching one AES key to one pak (see AssetService.BindPakKey).</summary>
+public sealed record PakKeyBinding(bool Bound, string Pak, string? KeyGuid, bool Mounted, int NewMounts, long FileCount, string? Reason);
 
 /// <summary>Transport-neutral façade shared by the CLI and the JSON-lines server.</summary>
 public sealed class AssetService : IDisposable
@@ -87,6 +93,117 @@ public sealed class AssetService : IDisposable
     }
 
     public IReadOnlyList<SessionSummary> ListSessions() => Sessions.All.Select(s => s.ToSummary()).ToList();
+
+    /// <summary>
+    /// Per-pak AES state for the pak picker. A live session answers without touching disk;
+    /// otherwise a throwaway provider registers the readers only (footer + index header, no mount).
+    /// </summary>
+    public IReadOnlyList<PakKeyState> ListPakKeys(string profileName)
+    {
+        GameProfile profile;
+        lock (_configLock)
+        {
+            if (!Config.Profiles.TryGetValue(profileName, out var stored))
+                throw AssetException.NotFound($"profile not found: {profileName}");
+            profile = stored;
+        }
+
+        var live = Sessions.All.FirstOrDefault(s => s.Profile.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase));
+        if (live?.Provider is AbstractVfsFileProvider mounted)
+        {
+            lock (_configLock) return PakKeys.Describe(mounted, guid => HasConfiguredKey(profile, guid));
+        }
+
+        var warnings = new List<string>();
+        using var provider = ProviderFactory.CreateProvider(profile, Config.OodleLibrary, warnings);
+        foreach (var pak in DshUeAsset.Core.Paks.PakCatalog.List(profile))
+        {
+            try { provider.RegisterVfs(pak.Path); }
+            catch { /* an unreadable pak simply stays out of the list */ }
+        }
+
+        lock (_configLock) return PakKeys.Describe(provider, guid => HasConfiguredKey(profile, guid));
+    }
+
+    /// <summary>
+    /// Bind one AES key to one pak. The key is validated against that pak's index header first,
+    /// so a wrong key is reported instead of being stored. When the profile is already open the
+    /// pak mounts immediately and the session summary is refreshed.
+    /// </summary>
+    public PakKeyBinding BindPakKey(string profileName, string pakName, string? key)
+    {
+        if (string.IsNullOrWhiteSpace(pakName)) throw AssetException.Invalid("pak name is empty");
+        var clean = ProviderFactory.CleanKey(key ?? string.Empty);
+        if (clean.Length == 0) throw AssetException.Invalid("aes key is empty");
+
+        GameProfile profile;
+        lock (_configLock)
+        {
+            if (!Config.Profiles.TryGetValue(profileName, out var stored))
+                throw AssetException.NotFound($"profile not found: {profileName}");
+            profile = stored;
+        }
+
+        var live = Sessions.All.FirstOrDefault(s => s.Profile.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase));
+        if (live?.Provider is AbstractVfsFileProvider mounted)
+            return BindOnProvider(profile, live, mounted, pakName, clean);
+
+        var warnings = new List<string>();
+        using var provider = ProviderFactory.CreateProvider(profile, Config.OodleLibrary, warnings);
+        var info = DshUeAsset.Core.Paks.PakCatalog.List(profile)
+            .FirstOrDefault(p => p.Name.Equals(pakName, StringComparison.OrdinalIgnoreCase))
+            ?? throw AssetException.NotFound($"pak not found in profile '{profileName}': {pakName}");
+        provider.RegisterVfs(info.Path);
+        return BindOnProvider(profile, null, provider, pakName, clean);
+    }
+
+    private PakKeyBinding BindOnProvider(GameProfile profile, GameSession? session, AbstractVfsFileProvider provider, string pakName, string cleanKey)
+    {
+        var reader = PakKeys.Find(provider, pakName)
+            ?? throw AssetException.NotFound($"pak is not registered: {pakName}");
+        if (!reader.IsEncrypted)
+            return new PakKeyBinding(false, reader.Name, null, true, 0, provider.Files.Count, "this pak is not encrypted");
+
+        var guid = reader.EncryptionKeyGuid;
+        if (!PakKeys.AcceptsKey(reader, cleanKey))
+            return new PakKeyBinding(false, reader.Name, guid.ToString(), false, 0, provider.Files.Count,
+                "the key was rejected by this pak (its index header does not decrypt)");
+
+        lock (_configLock)
+        {
+            var text = guid.ToString();
+            var entry = profile.DynamicKeys.FirstOrDefault(k => string.Equals(k.Guid, text, StringComparison.OrdinalIgnoreCase));
+            if (entry is null) profile.DynamicKeys.Add(new DynamicKey { Guid = text, Key = cleanKey });
+            else entry.Key = cleanKey;
+            SaveConfigLocked();
+        }
+
+        var submitted = provider.SubmitKey(guid, new FAesKey(cleanKey));
+        ProviderFactory.AfterMount(provider);
+        var mounted = PakKeys.IsMounted(provider, reader);
+        if (session is not null) session.UpdateReport(BuildMountReport(provider, session.Report));
+
+        return new PakKeyBinding(true, reader.Name, guid.ToString(), mounted, submitted, provider.Files.Count, null);
+    }
+
+    private static MountReport BuildMountReport(AbstractVfsFileProvider provider, MountReport previous)
+    {
+        var missing = provider.RequiredKeys.Select(guid => guid.ToString()).ToArray();
+        return new MountReport(
+            provider.MountedVfs.Count,
+            previous.Submitted + 1,
+            missing,
+            provider.Files.Count,
+            previous.EngineVersion,
+            missing.Length == 0 ? null : previous.Warning);
+    }
+
+    private static bool HasConfiguredKey(GameProfile profile, FGuid guid)
+    {
+        if (guid == default) return !string.IsNullOrWhiteSpace(profile.AesKey);
+        var text = guid.ToString();
+        return profile.DynamicKeys.Any(k => string.Equals(k.Guid, text, StringComparison.OrdinalIgnoreCase));
+    }
 
     public async Task<SessionSummary> OpenAsync(OpenRequest request, CancellationToken cancellationToken = default)
     {

@@ -66,7 +66,7 @@ window.__ModuleLoader__.load({
         oodle: 'Oodle DLL',
         meshFormat: '网格格式',
         sessions: '会话上限',
-        needsKey: '部分归档缺少 AES 密钥，已挂载部分仍可浏览',
+        needsKey: '部分归档缺少 AES 密钥，可关闭会话后在 PAK 列表点锁图标补密钥',
         jobRunning: '导出中',
         details: '属性',
         size: '大小',
@@ -128,7 +128,7 @@ window.__ModuleLoader__.load({
         oodle: 'Oodle DLL',
         meshFormat: 'Mesh format',
         sessions: 'Session limit',
-        needsKey: 'Some archives need AES keys; the mounted part stays browsable',
+        needsKey: 'Some archives need AES keys — close the session and click the lock in the PAK list',
         jobRunning: 'Exporting',
         details: 'Properties',
         size: 'Size',
@@ -262,7 +262,14 @@ window.__ModuleLoader__.load({
       .ue-lp-sec { font-size:10px; color:var(--dsw-alias-label-secondary); margin:4px 0 6px; letter-spacing:.04em; }
       .ue-sess { display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--dsw-alias-border-l1); border-radius:8px; margin-bottom:6px; background:var(--dsw-alias-bg-layer-1); }
       .ue-pak-filter { width:100%; padding:4px 8px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:transparent; color:inherit; font-size:11px; margin-bottom:6px; box-sizing:border-box; }
-      .ue-pak { display:flex; align-items:center; gap:6px; padding:3px 4px; border-radius:6px; font-size:11px; cursor:pointer; }
+      .ue-pak { display:flex; align-items:center; gap:6px; padding:3px 4px; border-radius:6px; font-size:11px; flex-wrap:wrap; }
+      .ue-pak-main { display:flex; align-items:center; gap:6px; flex:1; min-width:0; cursor:pointer; }
+      .ue-pak-lock { font-size:11px; line-height:1; flex:none; padding:2px; border:0; background:transparent; color:var(--dsw-alias-label-secondary); }
+      .ue-pak-lock.ok { color:var(--dsw-alias-state-success-primary, #47b881); }
+      .ue-pak-lock.warn { color:var(--dsw-alias-state-warning-primary, #d9a441); cursor:pointer; }
+      .ue-pak-lock.warn:hover { background:var(--dsw-alias-bg-layer-2); border-radius:4px; }
+      .ue-key-row { display:flex; gap:4px; width:100%; padding:2px 0 4px 20px; box-sizing:border-box; }
+      .ue-key-input { flex:1; min-width:0; padding:3px 6px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:transparent; color:inherit; font-size:11px; }
       .ue-pak:hover { background:var(--dsw-alias-bg-layer-2); }
       .ue-pak-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .ue-chip { font-size:9px; padding:1px 5px; border-radius:999px; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-secondary); flex:none; }
@@ -1227,6 +1234,10 @@ window.__ModuleLoader__.load({
       const [opening, setOpening] = useState(false)
       const [pakCatalog, setPakCatalog] = useState(null)
       const [selectedPaks, setSelectedPaks] = useState([])
+      // Per-pak AES state (pakKeys) and the one inline key editor that is currently open.
+      const [pakKeys, setPakKeys] = useState({})
+      const [keyEditor, setKeyEditor] = useState(null)
+      const [keyBusy, setKeyBusy] = useState(null)
       const [activeProfile, setActiveProfile] = useState(null)
       const [pakQuery, setPakQuery] = useState('')
       const [icons, setIcons] = useState({})
@@ -1284,10 +1295,15 @@ window.__ModuleLoader__.load({
       }, [previewPath, sessionId, tab])
 
       const loadPaks = async (profile) => {
-        setActiveProfile(profile); setError(null); setPakQuery('')
+        setActiveProfile(profile); setError(null); setPakQuery(''); setKeyEditor(null); setPakKeys({})
         try {
-          const catalog = await api('/paks', { profile })
+          // Key state is advisory: an older Host without /pak-keys must not break pak selection.
+          const [catalog, keys] = await Promise.all([
+            api('/paks', { profile }),
+            api('/pak-keys', { profile }).catch(() => [])
+          ])
           setPakCatalog(catalog)
+          setPakKeys(Object.fromEntries((keys || []).map((item) => [item.pak, item])))
           const defaults = catalog.defaults && catalog.defaults.length > 0
             ? catalog.defaults
             : catalog.available.filter((pak) => pak.chunk === 0).map((pak) => pak.name)
@@ -1324,6 +1340,23 @@ window.__ModuleLoader__.load({
       }
 
       const togglePak = (name) => setSelectedPaks((prev) => prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name])
+
+      // One key per pak: the Host validates it against the pak index header before storing it,
+      // so a typo is reported here instead of silently producing unreadable archives.
+      const bindPakKey = async (pak) => {
+        const value = ((keyEditor && keyEditor.value) || '').trim()
+        if (!value) return
+        setKeyBusy(pak); setError(null)
+        try {
+          const result = await api('/pak-key', { profile: activeProfile, pak, key: value })
+          if (!result || !result.bound) { setError((result && result.reason) || '密钥未被这个 pak 接受'); return }
+          setPakKeys((prev) => ({ ...prev, [pak]: { pak, encrypted: true, hasKey: true, keyGuid: result.keyGuid } }))
+          setKeyEditor(null)
+          if (result.mounted) await refresh()
+          push('已保存密钥 ' + (result.keyGuid ? '(' + result.keyGuid + ')' : ''))
+        } catch (e) { setError(e.message) }
+        finally { setKeyBusy(null) }
+      }
       const current = sessions.find((session) => session.sessionId === sessionId) || null
 
       const profiles = (config && config.profiles) || []
@@ -1345,11 +1378,40 @@ window.__ModuleLoader__.load({
             ),
             h('div', { className: 'ue-lp-body' },
               h('input', { className: 'ue-pak-filter', value: pakQuery, placeholder: t('filterPaks'), onChange: (event) => setPakQuery(event.target.value), onKeyDown: (event) => { if (event.key === 'Escape') setPakQuery('') } }),
-              filteredPaks.map((pak) => h('label', { key: pak.name, className: 'ue-pak', title: pak.name },
-                h('input', { type: 'checkbox', checked: selectedPaks.includes(pak.name), onChange: () => togglePak(pak.name) }),
-                h('span', { className: 'ue-pak-name' }, pak.name.replace(/^pakchunk/, 'chunk').replace(/\.(pak|utoc|ucas)$/i, '')),
-                h('span', { className: 'ue-chip' }, 'c' + pak.chunk),
-                (pak.tags || []).length > 0 ? h('span', { className: 'ue-chip' }, pak.tags.join(',')) : null)),
+              filteredPaks.map((pak) => {
+                const state = pakKeys[pak.name]
+                const encrypted = !!(state && state.encrypted)
+                const needsKey = encrypted && !state.hasKey
+                const editing = keyEditor && keyEditor.pak === pak.name
+                return h('div', { key: pak.name, className: 'ue-pak' },
+                  h('label', { className: 'ue-pak-main', title: pak.name + (state && state.keyGuid ? '\nAES ' + state.keyGuid : '') },
+                    h('input', { type: 'checkbox', checked: selectedPaks.includes(pak.name), onChange: () => togglePak(pak.name) }),
+                    h('span', { className: 'ue-pak-name' }, pak.name.replace(/^pakchunk/, 'chunk').replace(/\.(pak|utoc|ucas)$/i, '')),
+                    h('span', { className: 'ue-chip' }, 'c' + pak.chunk),
+                    (pak.tags || []).length > 0 ? h('span', { className: 'ue-chip' }, pak.tags.join(',')) : null),
+                  needsKey
+                    ? h('button', {
+                        className: 'ue-pak-lock warn',
+                        title: '缺少 AES 密钥（' + (state.keyGuid || '') + '），点击填写',
+                        onClick: () => setKeyEditor(editing ? null : { pak: pak.name, value: '' })
+                      }, '🔒')
+                    : null,
+                  editing
+                    ? h('div', { className: 'ue-key-row' },
+                        h('input', {
+                          className: 'ue-key-input',
+                          autoFocus: true,
+                          placeholder: 'AES key（32 位十六进制）',
+                          value: keyEditor.value,
+                          onChange: (event) => setKeyEditor({ pak: pak.name, value: event.target.value }),
+                          onKeyDown: (event) => {
+                            if (event.key === 'Enter') bindPakKey(pak.name)
+                            if (event.key === 'Escape') setKeyEditor(null)
+                          }
+                        }),
+                        h('button', { className: 'ue-btn primary', disabled: keyBusy === pak.name, onClick: () => bindPakKey(pak.name) }, keyBusy === pak.name ? '…' : '保存'))
+                    : null)
+              }),
               filteredPaks.length === 0 ? h('div', { className: 'ue-hint' }, t('noResults')) : null
             ),
             h('div', { className: 'ue-lp-foot' },

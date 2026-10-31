@@ -24,7 +24,10 @@ public sealed class GameSession : IDisposable
     public string Id { get; }
     public GameProfile Profile { get; }
     public IFileProvider Provider { get; }
-    public MountReport Report { get; }
+    public MountReport Report { get; private set; }
+
+    /// <summary>A late AES key mounts more archives; the summary must reflect the new state.</summary>
+    public void UpdateReport(MountReport report) => Report = report;
     public IReadOnlyList<string> Paks { get; }
     public JobQueue Jobs { get; }
     public DateTimeOffset CreatedAt { get; private set; }
