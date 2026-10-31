@@ -1739,6 +1739,9 @@ window.__ModuleLoader__.load({
             className: 'ue-game',
             open: originalName === profile.name,
             onToggle: (event) => {
+              // React dispatches toggle for nested <details> (the tag / prefix folds) up the tree
+              // as well, so a child fold closing must not collapse this card.
+              if (event.target !== event.currentTarget) return
               if (event.target.open && originalName !== profile.name) selectProfile(profile)
               else if (!event.target.open && originalName === profile.name) { setDraft(null); setOriginalName(null) }
             }
