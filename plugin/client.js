@@ -292,6 +292,16 @@ window.__ModuleLoader__.load({
       .ue-game > summary:before { content:'▸'; color:var(--dsw-alias-label-secondary); }
       .ue-game[open] > summary:before { content:'▾'; }
       .ue-game-body { padding:0 10px 10px; }
+      .ue-scroll { max-height:180px; overflow:auto; border:1px solid var(--dsw-alias-border-l1); border-radius:8px; padding:6px; }
+      .ue-fold { border:1px solid var(--dsw-alias-border-l1); border-radius:8px; margin-bottom:8px; }
+      .ue-fold > summary { cursor:pointer; padding:7px 10px; font-size:12px; color:var(--dsw-alias-label-secondary); list-style:none; display:flex; align-items:center; gap:6px; }
+      .ue-fold > summary::-webkit-details-marker { display:none; }
+      .ue-fold > summary:focus { outline:none; }
+      .ue-fold > summary:before { content:'▸'; font-size:10px; }
+      .ue-fold[open] > summary:before { content:'▾'; }
+      .ue-fold-count { margin-left:auto; font-size:10px; font-variant-numeric:tabular-nums; background:var(--dsw-alias-bg-layer-2, rgba(127,127,127,.18)); border-radius:999px; padding:1px 7px; }
+      .ue-fold-body { padding:0 10px 10px; }
+      .ue-actions { display:flex; gap:6px; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid var(--dsw-alias-border-l1); }
       .ue-field input:focus, .ue-field textarea:focus { border-color:var(--dsw-alias-brand-primary); }
       .ue-list { display:flex; flex-direction:column; gap:2px; margin-bottom:8px; }
       .ue-list-item { padding:6px 8px; border-radius:6px; cursor:pointer; }
@@ -1568,15 +1578,15 @@ window.__ModuleLoader__.load({
         } catch (e) { setError(e.message) }
       }
 
-      const renderPrefixRules = () => h('div', { className: 'ue-field' },
-        h('label', null, '类型前缀（AssetRegistry 没有条目时使用）'),
-        h('div', { style: { maxHeight: 180, overflow: 'auto' } },
-          (draft.prefixRules || []).map((rule, index) => h('div', { key: index, className: 'ue-anim', style: { marginBottom: 4 } },
-            h('input', { value: rule.prefix, placeholder: '前缀，如 SKM_', onChange: (event) => { const list = [...(draft.prefixRules || [])]; list[index] = { ...rule, prefix: event.target.value }; setDraft({ ...draft, prefixRules: list }) } }),
-            h('input', { value: rule.kind, placeholder: 'kind，如 data_asset', onChange: (event) => { const list = [...(draft.prefixRules || [])]; list[index] = { ...rule, kind: event.target.value }; setDraft({ ...draft, prefixRules: list }) } }),
-            h('button', { className: 'ue-btn', onClick: () => { const list = [...(draft.prefixRules || [])]; list.splice(index, 1); setDraft({ ...draft, prefixRules: list }) } }, '删除')
-          ))
-        ),
+      const renderPrefixRules = () => h('div', null,
+        (draft.prefixRules || []).length > 0
+          ? h('div', { className: 'ue-scroll', style: { maxHeight: 160, marginBottom: 6 } },
+              (draft.prefixRules || []).map((rule, index) => h('div', { key: index, className: 'ue-anim', style: { display: 'flex', gap: 4, marginBottom: 4 } },
+                h('input', { value: rule.prefix, placeholder: '前缀，如 SKM_', onChange: (event) => { const list = [...(draft.prefixRules || [])]; list[index] = { ...rule, prefix: event.target.value }; setDraft({ ...draft, prefixRules: list }) } }),
+                h('input', { value: rule.kind, placeholder: 'kind，如 data_asset', onChange: (event) => { const list = [...(draft.prefixRules || [])]; list[index] = { ...rule, kind: event.target.value }; setDraft({ ...draft, prefixRules: list }) } }),
+                h('button', { className: 'ue-btn', style: { flex: 'none' }, onClick: () => { const list = [...(draft.prefixRules || [])]; list.splice(index, 1); setDraft({ ...draft, prefixRules: list }) } }, '删除')
+              )))
+          : h('div', { className: 'ue-hint', style: { marginBottom: 6 } }, 'AssetRegistry 里查不到类型时，才按文件名前缀归类。'),
         h('button', { className: 'ue-btn', onClick: () => setDraft({ ...draft, prefixRules: [...(draft.prefixRules || []), { prefix: '', kind: 'asset' }] }) }, '新增规则')
       )
 
@@ -1605,6 +1615,19 @@ window.__ModuleLoader__.load({
         )
       }
 
+      const renderFold = (title, count, body) => h('details', { className: 'ue-fold' },
+        h('summary', null,
+          h('span', null, title),
+          h('span', { className: 'ue-fold-count' }, String(count))),
+        h('div', { className: 'ue-fold-body' }, body)
+      )
+
+      const saveAndReopen = async () => {
+        await saveProfile()
+        if (!draft) return
+        try { await api('/open', { profile: draft.name, paks: ['all'] }) } catch {}
+      }
+
       const renderDraft = () => {
         if (!draft) return null
         return h('div', { className: 'ue-game-body' },
@@ -1620,28 +1643,29 @@ window.__ModuleLoader__.load({
             h('input', { type: 'checkbox', checked: !!draft.clearAesKey, onChange: (event) => setDraft({ ...draft, clearAesKey: event.target.checked }) }),
             t('aesClear')),
           h('div', { className: 'ue-field' }, h('label', null, t('usmap')), h('input', { value: draft.usmap, onChange: (event) => setDraft({ ...draft, usmap: event.target.value }) })),
-          h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 } },
+          renderFold('PAK 标签（逗号分隔）', pakTagsCatalog ? pakTagsCatalog.available.length : 0,
+            pakTagsCatalog
+              ? h('div', null,
+                  h('div', { className: 'ue-scroll' },
+                    pakTagsCatalog.available.map((pak) => h('div', { key: pak.name, style: { marginBottom: 4 } },
+                      h('div', { className: 'ue-meta', style: { marginBottom: 2 } }, pak.name),
+                      h('input', { value: tagDrafts[pak.name] || '', placeholder: '如 base,ui,chapter1', onChange: (event) => setTagDrafts({ ...tagDrafts, [pak.name]: event.target.value }) })
+                    ))
+                  ),
+                  h('button', { className: 'ue-btn', onClick: savePakTags, style: { marginTop: 6 } }, '保存标签'))
+              : h('div', { className: 'ue-hint' }, t('loading'))),
+          renderFold('类型前缀', (draft.prefixRules || []).length, renderPrefixRules()),
+          h('div', { className: 'ue-actions' },
             h('button', { className: 'ue-btn primary', onClick: saveProfile }, t('save')),
-            h('button', { className: 'ue-btn', onClick: async () => { await saveProfile(); if (draft) await api('/open', { profile: draft.name, paks: ['all'] }).catch(() => {}) } }, '保存并重新打开'),
-            originalName ? h('button', { className: 'ue-btn danger', onClick: deleteProfile }, t('remove')) : null),
-          pakTagsCatalog
-            ? h('div', { className: 'ue-field' },
-                h('label', null, 'PAK 标签（逗号分隔）'),
-                h('div', { style: { maxHeight: 180, overflow: 'auto', border: '1px solid var(--dsw-alias-border-l1)', borderRadius: 8, padding: 6 } },
-                  pakTagsCatalog.available.map((pak) => h('div', { key: pak.name, style: { marginBottom: 4 } },
-                    h('div', { className: 'ue-meta', style: { marginBottom: 2 } }, pak.name),
-                    h('input', { value: tagDrafts[pak.name] || '', placeholder: '如 base,ui,chapter1', onChange: (event) => setTagDrafts({ ...tagDrafts, [pak.name]: event.target.value }) })
-                  ))
-                ),
-                h('button', { className: 'ue-btn', onClick: savePakTags, style: { marginTop: 6 } }, '保存标签'))
-            : null,
-          renderPrefixRules()
+            h('button', { className: 'ue-btn', onClick: saveAndReopen }, '保存并重新打开'),
+            originalName ? h('button', { className: 'ue-btn danger', style: { marginLeft: 'auto' }, onClick: deleteProfile }, t('remove')) : null)
         )
       }
 
       if (!config || !global) return h('div', { className: 'ue-empty' }, t('loading'))
 
-      return h('div', { className: 'ue-root' },
+      // 设置页由宿主铺底（bg-layer-2）：自己再画一层 bg-base 会变成一块更暗的矩形。
+      return h('div', { className: 'ue-root', style: { background: 'transparent', height: 'auto' } },
         h('div', { className: 'ue-section' },
           h('h4', { style: { display: 'flex', alignItems: 'center' } }, h('span', { className: 'ue-ue-mark', 'aria-hidden': 'true' }), t('settings')),
           h('div', { className: 'ue-hint' }, '配置文件：' + (config.configPath || '')),
