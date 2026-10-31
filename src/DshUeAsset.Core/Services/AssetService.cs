@@ -753,14 +753,43 @@ public sealed class AssetService : IDisposable
 
         var directory = NormalizeDirectory(request.Directory!);
         var name = new DirectoryInfo(directory).Name;
+        // An ad-hoc directory such as ".../Paks/~mods" carries no engine version of its own. Opening it
+        // as GAME_UE5_0 makes CUE4Parse silently drop every reader (mounted == 0), so a directory that
+        // lives inside a configured profile inherits that profile's container settings.
+        var inherited = InheritFromConfigured(directory);
         return new GameProfile
         {
             Name = string.IsNullOrWhiteSpace(name) ? "ad-hoc" : name,
             Directory = directory,
-            Game = string.IsNullOrWhiteSpace(request.Game) ? "GAME_UE5_0" : request.Game!,
-            AesKey = string.IsNullOrWhiteSpace(request.AesKey) ? null : request.AesKey,
-            Usmap = string.IsNullOrWhiteSpace(request.Usmap) ? null : request.Usmap
+            Game = !string.IsNullOrWhiteSpace(request.Game) ? request.Game! : inherited?.Game ?? "GAME_UE5_0",
+            Platform = inherited?.Platform ?? "DesktopMobile",
+            AesKey = !string.IsNullOrWhiteSpace(request.AesKey) ? request.AesKey : inherited?.AesKey,
+            Usmap = !string.IsNullOrWhiteSpace(request.Usmap) ? request.Usmap : inherited?.Usmap,
+            DynamicKeys = inherited is null
+                ? []
+                : inherited.DynamicKeys.Select(k => new DynamicKey { Guid = k.Guid, Key = k.Key }).ToList()
         };
+    }
+
+    /// <summary>
+    /// Longest configured profile whose paks directory contains <paramref name="directory"/>.
+    /// Used to inherit game/AES/usmap for ad-hoc subdirectories such as "~mods".
+    /// </summary>
+    private GameProfile? InheritFromConfigured(string directory)
+    {
+        GameProfile? best = null;
+        var bestLength = -1;
+        foreach (var candidate in Config.Profiles.Values)
+        {
+            var root = GameProfile.NormalizeDirectory(candidate.Directory);
+            if (root.Length == 0) continue;
+            var matches = string.Equals(root, directory, StringComparison.OrdinalIgnoreCase)
+                          || directory.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            if (!matches || root.Length <= bestLength) continue;
+            best = candidate;
+            bestLength = root.Length;
+        }
+        return best?.Clone();
     }
 
     private static string NormalizeDirectory(string input)

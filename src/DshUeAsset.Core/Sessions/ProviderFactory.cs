@@ -109,11 +109,26 @@ public static class ProviderFactory
         if (mounted == 0)
         {
             provider.Dispose();
+            var selected = selection is { Count: > 0 };
+            var detail = new
+            {
+                mounted,
+                newMounts,
+                missingKeys = missing,
+                directory = profile.Directory,
+                game = profile.Game,
+                paks = selected ? selection!.Select(p => p.Name).ToArray() : null
+            };
+            // A registered pak that mounts nothing is almost always a wrong version container, not a
+            // missing file: CUE4Parse drops the reader silently when the EGame does not match the pak.
             throw new AssetException(AssetErrorKind.NeedsKey,
                 missing.Length > 0
                     ? $"no archive could be mounted; missing AES keys for {missing.Length} GUID(s)"
-                    : "no archive could be mounted from the configured directory (no .pak/.utoc found)",
-                new { mounted, newMounts, missingKeys = missing, directory = profile.Directory });
+                    : selected
+                        ? $"none of the {selection!.Count} selected pak(s) could be mounted under engine container '{profile.Game}'; "
+                          + "a mismatched EGame makes the pak unreadable — pass the game-specific one (e.g. GAME_BlackMythWukong)"
+                        : "no archive could be mounted from the configured directory (no .pak/.utoc found)",
+                detail);
         }
 
         if (missing.Length > 0)
