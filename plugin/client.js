@@ -1589,7 +1589,8 @@ window.__ModuleLoader__.load({
           aesKey: '',
           clearAesKey: false,
           hasAesKey: profile.hasAesKey,
-          prefixRules: (profile.prefixRules || []).map((rule) => ({ prefix: rule.prefix, kind: rule.kind }))
+          prefixRules: (profile.prefixRules || []).map((rule) => ({ prefix: rule.prefix, kind: rule.kind })),
+          dynamicKeys: (profile.dynamicKeys || []).map((item) => ({ guid: item.guid, key: item.key }))
         })
       }
 
@@ -1606,7 +1607,10 @@ window.__ModuleLoader__.load({
             usmap: draft.usmap || null,
             aesKey: aesKey || null,
             clearAesKey: !!draft.clearAesKey,
-            prefixRules: draft.prefixRules || []
+            prefixRules: draft.prefixRules || [],
+            dynamicKeys: (draft.dynamicKeys || [])
+              .filter((item) => String(item.guid || '').trim() && String(item.key || '').trim())
+              .map((item) => ({ guid: String(item.guid).trim(), key: String(item.key).trim() }))
           })
           setAesKey('')
           push(t('save'))
@@ -1650,6 +1654,44 @@ window.__ModuleLoader__.load({
               )))
           : h('div', { className: 'ue-hint', style: { marginBottom: 6 } }, 'AssetRegistry 里查不到类型时，才按文件名前缀归类。'),
         h('button', { className: 'ue-btn', onClick: () => setDraft({ ...draft, prefixRules: [...(draft.prefixRules || []), { prefix: '', kind: 'asset' }] }) }, '新增规则')
+      )
+
+      // Dynamic AES keys: one GUID -> key pair per encrypted pak that does not use the main key.
+      // A pak bound from the picker lands in the same list, so both entry points stay in sync.
+      const renderDynamicKeys = () => h('div', null,
+        (draft.dynamicKeys || []).length > 0
+          ? h('div', { className: 'ue-scroll', style: { maxHeight: 160, marginBottom: 6 } },
+              (draft.dynamicKeys || []).map((item, index) => h('div', { key: index, className: 'ue-anim', style: { display: 'flex', gap: 4, marginBottom: 4 } },
+                h('input', {
+                  value: item.guid,
+                  placeholder: 'GUID（32 位，全 0 = 主密钥）',
+                  onChange: (event) => {
+                    const list = [...(draft.dynamicKeys || [])]
+                    list[index] = { ...item, guid: event.target.value }
+                    setDraft({ ...draft, dynamicKeys: list })
+                  }
+                }),
+                h('input', {
+                  value: item.key,
+                  placeholder: 'AES key（32 位十六进制）',
+                  onChange: (event) => {
+                    const list = [...(draft.dynamicKeys || [])]
+                    list[index] = { ...item, key: event.target.value }
+                    setDraft({ ...draft, dynamicKeys: list })
+                  }
+                }),
+                h('button', {
+                  className: 'ue-btn',
+                  style: { flex: 'none' },
+                  onClick: () => {
+                    const list = [...(draft.dynamicKeys || [])]
+                    list.splice(index, 1)
+                    setDraft({ ...draft, dynamicKeys: list })
+                  }
+                }, '删除')
+              )))
+          : h('div', { className: 'ue-hint', style: { marginBottom: 6 } }, '不同包用不同 key 时逐条添加；全 0 的 GUID 等价于上面的 AES 主密钥。'),
+        h('button', { className: 'ue-btn', onClick: () => setDraft({ ...draft, dynamicKeys: [...(draft.dynamicKeys || []), { guid: '', key: '' }] }) }, '新增密钥')
       )
 
       const renderGameSelect = () => {
@@ -1717,6 +1759,7 @@ window.__ModuleLoader__.load({
                   h('button', { className: 'ue-btn', onClick: savePakTags, style: { marginTop: 6 } }, '保存标签'))
               : h('div', { className: 'ue-hint' }, t('loading'))),
           renderFold('类型前缀', (draft.prefixRules || []).length, renderPrefixRules()),
+          renderFold('动态密钥', (draft.dynamicKeys || []).length, renderDynamicKeys()),
           h('div', { className: 'ue-actions' },
             h('button', { className: 'ue-btn primary', onClick: saveProfile }, t('save')),
             h('button', { className: 'ue-btn', onClick: saveAndReopen }, '保存并重新打开'),
@@ -1732,7 +1775,7 @@ window.__ModuleLoader__.load({
           h('h4', { style: { display: 'flex', alignItems: 'center' } }, h('span', { className: 'ue-ue-mark', 'aria-hidden': 'true' }), t('settings')),
           h('div', { className: 'ue-hint' }, '配置文件：' + (config.configPath || '')),
           h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 } },
-            h('button', { className: 'ue-btn', onClick: () => { setOriginalName(null); setAesKey(''); setDraft({ name: '', directory: '', extraDirectories: '', game: 'GAME_UE5_0', platform: 'DesktopMobile', usmap: '', aesKey: '', clearAesKey: false, hasAesKey: false, prefixRules: [] }) } }, t('newGame')),
+            h('button', { className: 'ue-btn', onClick: () => { setOriginalName(null); setAesKey(''); setDraft({ name: '', directory: '', extraDirectories: '', game: 'GAME_UE5_0', platform: 'DesktopMobile', usmap: '', aesKey: '', clearAesKey: false, hasAesKey: false, prefixRules: [], dynamicKeys: [] }) } }, t('newGame')),
             h('button', { className: 'ue-btn', onClick: async () => { try { const result = await api('/config/import', {}); push('FModel: ' + (result.imported || []).join(', ')); await load() } catch (e) { setError(e.message) } } }, t('importFmodel'))),
           config.profiles.map((profile) => h('details', {
             key: profile.name,

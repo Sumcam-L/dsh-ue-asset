@@ -11,7 +11,8 @@ public sealed record ProfileView(
     bool HasAesKey,
     int DynamicKeyCount,
     string? Usmap,
-    IReadOnlyList<PrefixRule> PrefixRules);
+    IReadOnlyList<PrefixRule> PrefixRules,
+    IReadOnlyList<DynamicKeyInput> DynamicKeys);
 
 public sealed record ConfigView(
     string ConfigPath,
