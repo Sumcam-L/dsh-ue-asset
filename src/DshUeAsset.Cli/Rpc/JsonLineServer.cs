@@ -197,6 +197,11 @@ public sealed class JsonLineServer
                     Required(p, "pak"),
                     Required(p, "key"));
 
+            case "clearPakKey":
+                return _service.ClearPakKey(
+                    Required(p, "profile"),
+                    Required(p, "pak"));
+
             case "close":
                 _service.Close(Required(p, "sessionId"));
                 return new { closed = true };

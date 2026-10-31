@@ -1510,6 +1510,9 @@ window.__ModuleLoader__.load({
       const [error, setError] = useState(null)
       const [pakTagsCatalog, setPakTagsCatalog] = useState(null)
       const [tagDrafts, setTagDrafts] = useState({})
+      const [pakKeyStates, setPakKeyStates] = useState([])
+      const [keyDrafts, setKeyDrafts] = useState({})
+      const [keyBusy, setKeyBusy] = useState(false)
       const [games, setGames] = useState([])
       const [icons, setIcons] = useState({})
       const [oodleBusy, setOodleBusy] = useState(false)
@@ -1556,11 +1559,14 @@ window.__ModuleLoader__.load({
       const loadPakTags = async (profileName) => {
         try {
           const catalog = await api('/paks', { profile: profileName })
-          setPakTagsCatalog(catalog)
+          // An unreadable pak directory answers with an error object, so normalize here instead of
+          // crashing the whole draft when the tag fold reads catalog.available.
+          const available = Array.isArray(catalog && catalog.available) ? catalog.available : []
+          setPakTagsCatalog({ ...(catalog || {}), available })
           const drafts = {}
-          for (const pak of catalog.available) drafts[pak.name] = (pak.tags || []).join(',')
+          for (const pak of available) drafts[pak.name] = (pak.tags || []).join(',')
           setTagDrafts(drafts)
-        } catch (e) { setError(e.message) }
+        } catch (e) { setError(e.message); setPakTagsCatalog(null) }
       }
 
       const savePakTags = async () => {
@@ -1575,9 +1581,47 @@ window.__ModuleLoader__.load({
         } catch (e) { setError(e.message) }
       }
 
+      // Every registered pak is listed here; the panel only renders the ones whose index header
+      // the profile main key cannot open, so the usual case is an empty block.
+      const loadPakKeys = async (profileName) => {
+        setPakKeyStates([])
+        setKeyDrafts({})
+        try {
+          const states = await api('/pak-keys', { profile: profileName })
+          setPakKeyStates(Array.isArray(states) ? states : [])
+        } catch { setPakKeyStates([]) }
+      }
+
+      const bindPakKey = async (pakName) => {
+        if (!draft) return
+        const key = String(keyDrafts[pakName] || '').trim()
+        if (!key) return
+        setKeyBusy(true)
+        try {
+          const result = await api('/pak-key', { profile: draft.name, pak: pakName, key })
+          if (result && result.bound) {
+            push('已绑定 ' + pakName)
+            await loadPakKeys(draft.name)
+          } else {
+            setError((result && result.reason) || 'key 被拒绝')
+          }
+        } catch (e) { setError(e.message) } finally { setKeyBusy(false) }
+      }
+
+      const clearPakKey = async (pakName) => {
+        if (!draft) return
+        setKeyBusy(true)
+        try {
+          await api('/pak-key/clear', { profile: draft.name, pak: pakName })
+          push('已清除 ' + pakName + '，重新打开会话生效')
+          await loadPakKeys(draft.name)
+        } catch (e) { setError(e.message) } finally { setKeyBusy(false) }
+      }
+
       const selectProfile = (profile) => {
         setOriginalName(profile.name)
         loadPakTags(profile.name)
+        loadPakKeys(profile.name)
         setAesKey('')
         setDraft({
           name: profile.name,
@@ -1589,8 +1633,7 @@ window.__ModuleLoader__.load({
           aesKey: '',
           clearAesKey: false,
           hasAesKey: profile.hasAesKey,
-          prefixRules: (profile.prefixRules || []).map((rule) => ({ prefix: rule.prefix, kind: rule.kind })),
-          dynamicKeys: (profile.dynamicKeys || []).map((item) => ({ guid: item.guid, key: item.key }))
+          prefixRules: (profile.prefixRules || []).map((rule) => ({ prefix: rule.prefix, kind: rule.kind }))
         })
       }
 
@@ -1607,10 +1650,7 @@ window.__ModuleLoader__.load({
             usmap: draft.usmap || null,
             aesKey: aesKey || null,
             clearAesKey: !!draft.clearAesKey,
-            prefixRules: draft.prefixRules || [],
-            dynamicKeys: (draft.dynamicKeys || [])
-              .filter((item) => String(item.guid || '').trim() && String(item.key || '').trim())
-              .map((item) => ({ guid: String(item.guid).trim(), key: String(item.key).trim() }))
+            prefixRules: draft.prefixRules || []
           })
           setAesKey('')
           push(t('save'))
@@ -1656,43 +1696,41 @@ window.__ModuleLoader__.load({
         h('button', { className: 'ue-btn', onClick: () => setDraft({ ...draft, prefixRules: [...(draft.prefixRules || []), { prefix: '', kind: 'asset' }] }) }, '新增规则')
       )
 
-      // Dynamic AES keys: one GUID -> key pair per encrypted pak that does not use the main key.
-      // A pak bound from the picker lands in the same list, so both entry points stay in sync.
-      const renderDynamicKeys = () => h('div', null,
-        (draft.dynamicKeys || []).length > 0
-          ? h('div', { className: 'ue-scroll', style: { maxHeight: 160, marginBottom: 6 } },
-              (draft.dynamicKeys || []).map((item, index) => h('div', { key: index, className: 'ue-anim', style: { display: 'flex', gap: 4, marginBottom: 4 } },
+      // Only paks whose index header the profile main key cannot open are listed, and saving one
+      // goes through the same validated bind the PAK picker uses, so a wrong key is rejected here.
+      const renderPakKeys = () => {
+        const need = pakKeyStates.filter((state) => state.needsOwnKey)
+        if (need.length === 0) {
+          return h('div', { className: 'ue-hint' },
+            pakKeyStates.length > 0
+              ? '这个配置里的加密包都能用上面的主密钥解开，无需单独的 key。'
+              : t('loading'))
+        }
+        return h('div', null,
+          h('div', { className: 'ue-scroll', style: { maxHeight: 200, marginBottom: 6 } },
+            need.map((state) => h('div', { key: state.pak, style: { marginBottom: 6 } },
+              h('div', { className: 'ue-meta', style: { display: 'flex', gap: 6, alignItems: 'center', marginBottom: 2 } },
+                h('span', { style: { flex: 1, minWidth: 0, overflowWrap: 'anywhere' } }, state.pak),
+                state.hasKey
+                  ? h('span', { style: { flex: 'none', display: 'flex', gap: 4, alignItems: 'center' } },
+                      h('span', null, '已配置'),
+                      h('button', { className: 'ue-btn', style: { flex: 'none' }, disabled: keyBusy, onClick: () => clearPakKey(state.pak) }, '清除'))
+                  : null),
+              h('div', { style: { display: 'flex', gap: 4 } },
                 h('input', {
-                  value: item.guid,
-                  placeholder: 'GUID（32 位，全 0 = 主密钥）',
-                  onChange: (event) => {
-                    const list = [...(draft.dynamicKeys || [])]
-                    list[index] = { ...item, guid: event.target.value }
-                    setDraft({ ...draft, dynamicKeys: list })
-                  }
-                }),
-                h('input', {
-                  value: item.key,
+                  type: 'password',
+                  value: keyDrafts[state.pak] || '',
                   placeholder: 'AES key（32 位十六进制）',
-                  onChange: (event) => {
-                    const list = [...(draft.dynamicKeys || [])]
-                    list[index] = { ...item, key: event.target.value }
-                    setDraft({ ...draft, dynamicKeys: list })
-                  }
+                  onChange: (event) => setKeyDrafts({ ...keyDrafts, [state.pak]: event.target.value })
                 }),
                 h('button', {
                   className: 'ue-btn',
                   style: { flex: 'none' },
-                  onClick: () => {
-                    const list = [...(draft.dynamicKeys || [])]
-                    list.splice(index, 1)
-                    setDraft({ ...draft, dynamicKeys: list })
-                  }
-                }, '删除')
-              )))
-          : h('div', { className: 'ue-hint', style: { marginBottom: 6 } }, '不同包用不同 key 时逐条添加；全 0 的 GUID 等价于上面的 AES 主密钥。'),
-        h('button', { className: 'ue-btn', onClick: () => setDraft({ ...draft, dynamicKeys: [...(draft.dynamicKeys || []), { guid: '', key: '' }] }) }, '新增密钥')
-      )
+                  disabled: keyBusy || !String(keyDrafts[state.pak] || '').trim(),
+                  onClick: () => bindPakKey(state.pak)
+                }, t('save'))))))
+        )
+      }
 
       const renderGameSelect = () => {
         if (games.length === 0) {
@@ -1759,7 +1797,7 @@ window.__ModuleLoader__.load({
                   h('button', { className: 'ue-btn', onClick: savePakTags, style: { marginTop: 6 } }, '保存标签'))
               : h('div', { className: 'ue-hint' }, t('loading'))),
           renderFold('类型前缀', (draft.prefixRules || []).length, renderPrefixRules()),
-          renderFold('动态密钥', (draft.dynamicKeys || []).length, renderDynamicKeys()),
+          renderFold('PAK 密钥', pakKeyStates.filter((state) => state.needsOwnKey).length, renderPakKeys()),
           h('div', { className: 'ue-actions' },
             h('button', { className: 'ue-btn primary', onClick: saveProfile }, t('save')),
             h('button', { className: 'ue-btn', onClick: saveAndReopen }, '保存并重新打开'),
@@ -1775,7 +1813,7 @@ window.__ModuleLoader__.load({
           h('h4', { style: { display: 'flex', alignItems: 'center' } }, h('span', { className: 'ue-ue-mark', 'aria-hidden': 'true' }), t('settings')),
           h('div', { className: 'ue-hint' }, '配置文件：' + (config.configPath || '')),
           h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 } },
-            h('button', { className: 'ue-btn', onClick: () => { setOriginalName(null); setAesKey(''); setDraft({ name: '', directory: '', extraDirectories: '', game: 'GAME_UE5_0', platform: 'DesktopMobile', usmap: '', aesKey: '', clearAesKey: false, hasAesKey: false, prefixRules: [], dynamicKeys: [] }) } }, t('newGame')),
+            h('button', { className: 'ue-btn', onClick: () => { setOriginalName(null); setAesKey(''); setDraft({ name: '', directory: '', extraDirectories: '', game: 'GAME_UE5_0', platform: 'DesktopMobile', usmap: '', aesKey: '', clearAesKey: false, hasAesKey: false, prefixRules: [] }) } }, t('newGame')),
             h('button', { className: 'ue-btn', onClick: async () => { try { const result = await api('/config/import', {}); push('FModel: ' + (result.imported || []).join(', ')); await load() } catch (e) { setError(e.message) } } }, t('importFmodel'))),
           config.profiles.map((profile) => h('details', {
             key: profile.name,

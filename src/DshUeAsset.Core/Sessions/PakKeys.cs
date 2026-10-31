@@ -9,7 +9,9 @@ namespace DshUeAsset.Core.Sessions;
 /// AES state of one registered pak. CUE4Parse keeps the reader in UnloadedVfs until a matching
 /// key arrives; EncryptionKeyGuid is read from the pak footer, so this works without mounting.
 /// </summary>
-public sealed record PakKeyState(string Pak, bool Encrypted, string? KeyGuid, bool HasKey);
+/// NeedsOwnKey is false once the profile main key opens this pak, so the settings list only
+/// shows archives that actually require an extra key of their own.
+public sealed record PakKeyState(string Pak, bool Encrypted, string? KeyGuid, bool HasKey, bool NeedsOwnKey);
 
 public static class PakKeys
 {
@@ -47,13 +49,17 @@ public static class PakKeys
     /// <summary>
     /// Describe every pak, marking HasKey when the profile already stores a key for its GUID.
     /// A zero GUID is the "default" slot, which the profile AES key fills.
+    /// Testing the main key decrypts this pak's index header — the same cost as one mount
+    /// attempt — which is what lets NeedsOwnKey drop archives the main key already opens.
     /// </summary>
-    public static IReadOnlyList<PakKeyState> Describe(AbstractVfsFileProvider provider, Func<FGuid, bool>? hasKey = null)
+    public static IReadOnlyList<PakKeyState> Describe(AbstractVfsFileProvider provider, string? mainKey, Func<FGuid, bool>? hasKey = null)
     {
+        var hasMain = !string.IsNullOrWhiteSpace(mainKey);
         var list = new List<PakKeyState>();
         foreach (var reader in Readers(provider))
         {
             var guid = reader.EncryptionKeyGuid;
+            var mainWorks = !reader.IsEncrypted || (hasMain && AcceptsKey(reader, mainKey!));
             var known = !reader.IsEncrypted
                         || provider.Keys.ContainsKey(guid)
                         || (hasKey?.Invoke(guid) ?? false);
@@ -61,7 +67,8 @@ public static class PakKeys
                 reader.Name,
                 reader.IsEncrypted,
                 reader.IsEncrypted ? guid.ToString() : null,
-                known));
+                known,
+                reader.IsEncrypted && !mainWorks));
         }
         return list.OrderBy(state => state.Pak, StringComparer.OrdinalIgnoreCase).ToList();
     }

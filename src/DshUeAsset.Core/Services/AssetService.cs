@@ -111,7 +111,7 @@ public sealed class AssetService : IDisposable
         var live = Sessions.All.FirstOrDefault(s => s.Profile.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase));
         if (live?.Provider is AbstractVfsFileProvider mounted)
         {
-            lock (_configLock) return PakKeys.Describe(mounted, guid => HasConfiguredKey(profile, guid));
+            lock (_configLock) return PakKeys.Describe(mounted, profile.AesKey, guid => HasConfiguredKey(profile, guid));
         }
 
         var warnings = new List<string>();
@@ -122,7 +122,7 @@ public sealed class AssetService : IDisposable
             catch { /* an unreadable pak simply stays out of the list */ }
         }
 
-        lock (_configLock) return PakKeys.Describe(provider, guid => HasConfiguredKey(profile, guid));
+        lock (_configLock) return PakKeys.Describe(provider, profile.AesKey, guid => HasConfiguredKey(profile, guid));
     }
 
     /// <summary>
@@ -184,6 +184,48 @@ public sealed class AssetService : IDisposable
         if (session is not null) session.UpdateReport(BuildMountReport(provider, session.Report));
 
         return new PakKeyBinding(true, reader.Name, guid.ToString(), mounted, submitted, provider.Files.Count, null);
+    }
+
+    /// <summary>
+    /// Drop the per-pak key from the profile. A live session already submitted it, so the caller
+    /// is told to reopen instead of pretending the mounted archives went away.
+    /// </summary>
+    public PakKeyBinding ClearPakKey(string profileName, string pakName)
+    {
+        if (string.IsNullOrWhiteSpace(pakName)) throw AssetException.Invalid("pak name is empty");
+
+        GameProfile profile;
+        lock (_configLock)
+        {
+            if (!Config.Profiles.TryGetValue(profileName, out var stored))
+                throw AssetException.NotFound($"profile not found: {profileName}");
+            profile = stored;
+        }
+
+        var live = Sessions.All.FirstOrDefault(s => s.Profile.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase));
+        if (live?.Provider is AbstractVfsFileProvider mounted) return ClearOnProvider(profile, mounted, pakName);
+
+        var warnings = new List<string>();
+        using var provider = ProviderFactory.CreateProvider(profile, Config.OodleLibrary, warnings);
+        var info = DshUeAsset.Core.Paks.PakCatalog.List(profile)
+            .FirstOrDefault(p => p.Name.Equals(pakName, StringComparison.OrdinalIgnoreCase))
+            ?? throw AssetException.NotFound($"pak not found in profile '{profileName}': {pakName}");
+        provider.RegisterVfs(info.Path);
+        return ClearOnProvider(profile, provider, pakName);
+    }
+
+    private PakKeyBinding ClearOnProvider(GameProfile profile, AbstractVfsFileProvider provider, string pakName)
+    {
+        var reader = PakKeys.Find(provider, pakName)
+            ?? throw AssetException.NotFound($"pak is not registered: {pakName}");
+        var text = reader.EncryptionKeyGuid.ToString();
+        lock (_configLock)
+        {
+            profile.DynamicKeys.RemoveAll(k => string.Equals(k.Guid, text, StringComparison.OrdinalIgnoreCase));
+            SaveConfigLocked();
+        }
+        return new PakKeyBinding(false, reader.Name, text, PakKeys.IsMounted(provider, reader), 0, provider.Files.Count,
+            "key removed; reopen the session so the pak mounts again");
     }
 
     private static MountReport BuildMountReport(AbstractVfsFileProvider provider, MountReport previous)

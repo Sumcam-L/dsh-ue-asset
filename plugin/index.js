@@ -757,6 +757,7 @@ function registerRoutes(ctx, cli) {
   route('POST', '/tag/set', 'setTag')
   route('POST', '/pak-keys', 'pakKeys')
   route('POST', '/pak-key', 'bindPakKey')
+  route('POST', '/pak-key/clear', 'clearPakKey')
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
