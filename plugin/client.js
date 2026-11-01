@@ -235,6 +235,15 @@ window.__ModuleLoader__.load({
       .ue-anim { display:flex; gap:6px; align-items:center; margin-top:6px; }
       .ue-anim input { flex:1; min-width:0; padding:5px 7px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-base); color:var(--dsw-alias-label-primary); font-size:12px; }
       .ue-pre { margin:0; padding:8px; background:var(--dsw-alias-bg-layer-2); border-radius:8px; font-size:11px; line-height:1.45; overflow:auto; max-height:320px; white-space:pre-wrap; word-break:break-all; }
+      /* Properties JSON used to sit under the preview as a bare dark box with no label; the fold
+         gives it a name and keeps a long dump from eating the pane. */
+      .ue-props { border:1px solid var(--dsw-alias-border-l1); border-radius:8px; background:var(--dsw-alias-bg-layer-1); padding:0 8px; }
+      .ue-props > summary { cursor:pointer; padding:6px 0; font-size:11px; color:var(--dsw-alias-label-secondary); display:flex; gap:6px; align-items:center; list-style:none; }
+      .ue-props > summary::-webkit-details-marker { display:none; }
+      .ue-props > summary::before { content:'▸'; font-size:9px; line-height:1; }
+      .ue-props[open] > summary::before { content:'▾'; }
+      .ue-props[open] > summary { border-bottom:1px solid var(--dsw-alias-border-l1); margin-bottom:6px; }
+      .ue-props .ue-fold-count { margin-left:auto; opacity:.65; font-variant-numeric:tabular-nums; }
       .ue-pp { display:flex; flex-direction:column; flex:1; min-height:0; }
       .ue-pp-head { display:flex; align-items:center; gap:6px; padding:6px 8px; border-bottom:1px solid var(--dsw-alias-border-l1); flex:none; }
       .ue-pp-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
@@ -1217,7 +1226,13 @@ window.__ModuleLoader__.load({
                       data && data.width ? h('span', { className: 'ue-chip' }, data.width + '×' + data.height) : null),
                     data && data.note ? h('div', { className: 'ue-hint' }, data.note) : null,
                     mesh && mesh.animationError ? h('div', { className: 'ue-banner' }, mesh.animationError) : null,
-                    json ? h('pre', { className: 'ue-pre' }, json) : null
+                    json && json.length > 2
+                      ? h('details', { className: 'ue-props' },
+                          h('summary', null,
+                            h('span', null, '属性 JSON'),
+                            h('span', { className: 'ue-fold-count' }, json.length + ' 字符')),
+                          h('pre', { className: 'ue-pre' }, json))
+                      : null
                   )))
         )
       );
