@@ -23,20 +23,25 @@ public static class AssetAnalyzer
 
         var hasBlueprintExport = inspect.Exports.Any(e =>
             e.ClassName.Contains("BlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase));
+        // Dispatch on the resolved kind, not on substrings of the class name: SkeletalMeshLODSettings
+        // contains "SkeletalMesh" but is a settings data asset, and a Contains() test renders every
+        // such lookalike as an empty mesh card.
         var card = hasBlueprintExport
             ? BlueprintCard(props, inspect, name)
-            : className switch
+            : kind switch
         {
-            var c when c.Contains("MaterialInstance", StringComparison.OrdinalIgnoreCase) => MaterialCard(provider, objectPath, props, className, true),
-            var c when c.Contains("Material", StringComparison.OrdinalIgnoreCase) && !c.Contains("Expression") => MaterialCard(provider, objectPath, props, className, false),
-            var c when c.Contains("BlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase) => BlueprintCard(props, inspect, name),
-            var c when c.Contains("DataTable", StringComparison.OrdinalIgnoreCase) => DataTableCard(root),
-            var c when c.Contains("Texture", StringComparison.OrdinalIgnoreCase) => TextureCard(provider, objectPath, root, props),
-            var c when c.Contains("AnimSequence", StringComparison.OrdinalIgnoreCase) || c.Contains("AnimMontage", StringComparison.OrdinalIgnoreCase) => AnimCard(root, props),
-            var c when c.Contains("SkeletalMesh", StringComparison.OrdinalIgnoreCase) => MeshCard(root, props, skeletal: true),
-            var c when c.Contains("StaticMesh", StringComparison.OrdinalIgnoreCase) => MeshCard(root, props, skeletal: false),
-            var c when c.Contains("Skeleton", StringComparison.OrdinalIgnoreCase) => SkeletonCard(root, props),
-            var c when c.Contains("SoundWave", StringComparison.OrdinalIgnoreCase) || c.Contains("SoundCue", StringComparison.OrdinalIgnoreCase) => SoundCard(root, props),
+            "material_instance" => MaterialCard(provider, objectPath, props, className, true),
+            // MaterialExpression* are nodes of a graph, not materials.
+            "material" when !className.Contains("Expression", StringComparison.OrdinalIgnoreCase) => MaterialCard(provider, objectPath, props, className, false),
+            "data_table" => DataTableCard(root),
+            "texture" => TextureCard(provider, objectPath, root, props),
+            "anim_sequence" or "anim_montage" or "anim_composite" => AnimCard(root, props),
+            "skeletal_mesh" => MeshCard(root, props, skeletal: true),
+            "static_mesh" => MeshCard(root, props, skeletal: false),
+            "skeleton" => SkeletonCard(root, props),
+            "sound" when className.Contains("SoundWave", StringComparison.OrdinalIgnoreCase)
+                      || className.Contains("SoundCue", StringComparison.OrdinalIgnoreCase) => SoundCard(root, props),
+            "blueprint" or "anim_blueprint" => BlueprintCard(props, inspect, name),
             _ => GenericCard(props, inspect)
         };
 

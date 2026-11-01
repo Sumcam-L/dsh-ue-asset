@@ -93,7 +93,8 @@ public static class AssetKind
             "skeletalmesh" => "skeletal_mesh",
             "skeleton" => "skeleton",
             "staticmesh" => "static_mesh",
-            "texture2d" or "texturecube" or "texturerendertarget" or "texture2darray" or "volume" => "texture",
+            "texture2d" or "texturecube" or "texturerendertarget" or "texturerendertarget2d" or "texture2darray"
+                or "volumetexture" or "textureexternal" or "virtualtexture2d" or "volume" => "texture",
             "material" => "material",
             "materialinstance" or "materialinstanceconstant" or "materialinstancedynamic" => "material_instance",
             "materialfunction" or "materialfunctioninstance" => "material_function",
