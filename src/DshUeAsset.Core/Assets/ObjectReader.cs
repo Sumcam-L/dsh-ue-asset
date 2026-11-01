@@ -79,8 +79,26 @@ public static class ObjectReader
             }
         }
 
+        // Cooked USharp data assets carry no tagged properties, so their import table is the only
+        // readable description of what the asset is made of.
+        // IPackage only exposes the count, so reach into the concrete package for the entries.
+        var imports = new List<ImportSummary>();
+        if (package is Package concretePackage)
+        {
+            var projectRoot = AssetQuery.ProjectContentRoot(provider);
+            for (var i = 0; i < concretePackage.ImportMap.Length && imports.Count < 500; i++)
+            {
+                var entry = concretePackage.ImportMap[i];
+                imports.Add(new ImportSummary(
+                    i,
+                    Safe(() => entry.ObjectName.Text),
+                    Safe(() => entry.ClassName.Text),
+                    AssetQuery.VirtualizeObjectPath(ImportPath(concretePackage, i), projectRoot)));
+            }
+        }
+
         var note = objectName is not null && main is null ? $"object '{objectName}' not found in package; showing metadata only" : null;
-        return new InspectResult(meta, summary, json, truncated, note);
+        return new InspectResult(meta, summary, imports, json, truncated, note);
     }
 
     public static UObject Load(IFileProvider provider, string objectPath)
@@ -145,6 +163,31 @@ public static class ObjectReader
             return (value, null);
 
         return (value[..dot], suffix);
+    }
+
+    /// <summary>
+    /// Walks an import's outer chain and joins it, e.g. "Default__X" under "/Game/A" becomes
+    /// "/Game/A/Default__X". Returns null when the root is not a package path, which happens for
+    /// references into native script packages.
+    /// </summary>
+    private static string? ImportPath(Package package, int index)
+    {
+        var chain = new List<string>(4);
+        var current = index;
+        for (var guard = 0; guard < 16; guard++)
+        {
+            if (current < 0 || current >= package.ImportMap.Length) return null;
+            var entry = package.ImportMap[current];
+            chain.Add(entry.ObjectName.Text);
+            var outer = entry.OuterIndex;
+            if (outer is null || outer.IsNull) break;
+            if (outer.IsExport) return null;
+            current = -outer.Index - 1;
+        }
+
+        // The outermost entry is the package, whose name is already the full object path; joining
+        // the export name on top of it would repeat the last segment.
+        return chain.Count > 0 && chain[^1].StartsWith('/') ? chain[^1] : null;
     }
 
     private static string Safe(Func<string> read)

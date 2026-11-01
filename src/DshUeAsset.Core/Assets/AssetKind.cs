@@ -84,6 +84,10 @@ public static class AssetKind
             return name.Contains("AnimBlueprint", StringComparison.OrdinalIgnoreCase) ? "anim_blueprint" : "blueprint";
         }
 
+        // Black Myth's USharp data assets are named BP_* but their class says what they are; the
+        // filename prefix would otherwise file a GhostActorConfig under "blueprint".
+        if (name.Contains("DataAsset", StringComparison.OrdinalIgnoreCase)) return "data_asset";
+
         return name.ToLowerInvariant() switch
         {
             "skeletalmesh" => "skeletal_mesh",

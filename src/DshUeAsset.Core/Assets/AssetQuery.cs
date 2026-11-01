@@ -192,6 +192,44 @@ public static class AssetQuery
         return null;
     }
 
+    /// <summary>
+    /// The project's mount point, e.g. "b1" for "b1/Content/...". Discovered from the file list
+    /// because a cooked archive mounts "/Game" at "&lt;Project&gt;/Content" and the name is not recorded.
+    /// </summary>
+    public static string? ProjectContentRoot(IFileProvider provider)
+    {
+        foreach (var key in provider.Files.Keys)
+        {
+            if (key.StartsWith("Engine/", StringComparison.OrdinalIgnoreCase)) continue;
+            var index = key.IndexOf("/Content/", StringComparison.OrdinalIgnoreCase);
+            if (index <= 0) continue;
+            var root = key[..index];
+            if (root.Contains('/')) continue;
+            return root;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Turns a UE object path ("/Game/A/B", "/Engine/A/B") into a provider virtual path so an
+    /// import can be opened straight from a card. Package import entries carry these API paths.
+    /// </summary>
+    public static string? VirtualizeObjectPath(string? objectPath, string? projectRoot)
+    {
+        if (string.IsNullOrWhiteSpace(objectPath)) return null;
+        var path = objectPath.Trim();
+        if (!path.StartsWith('/')) return path;
+
+        var rest = path[1..];
+        var slash = rest.IndexOf('/');
+        var root = slash < 0 ? rest : rest[..slash];
+        var tail = slash < 0 ? string.Empty : rest[(slash + 1)..];
+
+        if (root.Equals("Engine", StringComparison.OrdinalIgnoreCase)) return "Engine/Content/" + tail;
+        if (!root.Equals("Game", StringComparison.OrdinalIgnoreCase)) return null;
+        return projectRoot is null ? null : projectRoot + "/Content/" + tail;
+    }
+
     /// <summary>Resolves "Foo" to "Foo.uasset" / "Foo.umap" when the caller omitted the extension.</summary>
     public static string ResolveVirtualPath(IFileProvider provider, string virtualPath)
     {

@@ -17,7 +17,9 @@ public static class AssetAnalyzer
         var props = root["Properties"] as JObject ?? new JObject();
         var className = inspect.Meta.ClassName ?? "";
         var name = Path.GetFileName(objectPath);
-        var kind = AssetKind.Resolve(provider, null, objectPath, name, inspect.Meta.Extension);
+        // The registry records a data-asset blueprint as BlueprintGeneratedClass, which hides what the
+        // package really is; the export's own class name is the more accurate answer.
+        var kind = AssetKind.ClassToKind(className) ?? AssetKind.Resolve(provider, null, objectPath, name, inspect.Meta.Extension);
 
         var hasBlueprintExport = inspect.Exports.Any(e =>
             e.ClassName.Contains("BlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase));
@@ -454,13 +456,36 @@ public static class AssetAnalyzer
     private static JObject GenericCard(JObject props, Models.InspectResult inspect)
     {
         var keys = new JArray(props.Properties().Take(200).Select(p => p.Name));
+        // Classes that serialize outside the standard tagged-property path (Black Myth's USharp
+        // BGW*DataAsset family) keep no properties at all, but the import table still names the
+        // assets they point at, which is the only readable description they have.
+        var seenImports = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var imports = new JArray(inspect.Imports
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name)
+                           // Package entries are just path containers; the objects below them already
+                           // carry the full path, so listing them again only doubles the noise.
+                           && !string.Equals(item.ClassName, "Package", StringComparison.OrdinalIgnoreCase)
+                           && !string.Equals(item.ClassName, "SharpClass", StringComparison.OrdinalIgnoreCase)
+                           && !(item.Path?.StartsWith("/Script", StringComparison.OrdinalIgnoreCase) ?? false)
+                           && seenImports.Add(item.Path ?? item.Name))
+            .Take(80)
+            .Select(item => new JObject
+            {
+                ["name"] = item.Name,
+                ["className"] = item.ClassName,
+                ["path"] = item.Path
+            }));
+
         return new JObject
         {
             ["type"] = "generic",
             ["propertyCount"] = props.Count,
             ["propertyKeys"] = keys,
+            ["imports"] = imports,
             ["mappingMissing"] = props.Count == 0 && inspect.Meta.ImportCount > 0,
-            ["note"] = props.Count == 0 ? "no serialized properties: class mapping may be missing for this profile" : null
+            ["note"] = props.Count == 0
+                ? "no serialized properties: this class does not store tagged properties (or its mapping is missing), so the card lists what the asset references"
+                : null
         };
     }
 

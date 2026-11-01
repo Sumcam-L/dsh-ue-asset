@@ -289,8 +289,18 @@ window.__ModuleLoader__.load({
       .ue-table th:last-child, .ue-table td:last-child { padding-right:14px; }
       .ue-chip-list { display:flex; flex-wrap:wrap; gap:4px; }
       .ue-bone-list { display:flex; flex-wrap:wrap; gap:4px; max-height:190px; overflow:auto; }
+      .ue-refs { display:flex; flex-direction:column; border:1px solid var(--dsw-alias-border-l1); border-radius:8px; overflow:hidden; max-height:300px; }
+      .ue-ref { display:flex; align-items:center; gap:8px; padding:4px 8px; font-size:11px; cursor:pointer; min-width:0; }
+      .ue-ref:nth-child(odd) { background:var(--dsw-alias-bg-layer-1); }
+      .ue-ref:hover { background:var(--dsw-alias-bg-layer-2); }
+      .ue-ref.flat { cursor:default; color:var(--dsw-alias-label-secondary); }
+      .ue-ref.flat:hover { background:transparent; }
+      .ue-ref-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-ref-kind { flex:none; font-size:10px; color:var(--dsw-alias-label-tertiary); }
       .ue-bone { font-size:10px; padding:1px 6px; border-radius:4px; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-secondary); font-family:var(--dsw-font-mono, ui-monospace, monospace); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .ue-typebar { display:flex; align-items:center; gap:6px; padding:2px 2px 0; font-size:11px; color:var(--dsw-alias-label-secondary); }
+      .ue-typebar > span { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .ue-typebar > span:first-child { flex:none; }
       .ue-viewswitch { margin-left:auto; display:flex; gap:2px; background:var(--dsw-alias-bg-layer-1); border-radius:6px; padding:2px; flex:none; }
       .ue-seg { border:0; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; }
       .ue-seg.on { background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary); }
@@ -1534,11 +1544,30 @@ window.__ModuleLoader__.load({
 
     function GenericCardView(props) {
       const card = props.card || {}
+      const onPick = props.onPick
       const keys = (Array.isArray(card.propertyKeys) ? card.propertyKeys : []).filter(Boolean)
+      const imports = (Array.isArray(card.imports) ? card.imports : []).filter((item) => item && item.name)
       return h('div', { className: 'ue-card' },
-        h(ChipRow, { chips: [card.propertyCount !== null && card.propertyCount !== undefined ? card.propertyCount + ' 个属性' : null, card.mappingMissing ? '映射缺失' : null] }),
+        h(ChipRow, {
+          chips: [
+            card.propertyCount !== null && card.propertyCount !== undefined && card.propertyCount > 0 ? card.propertyCount + ' 个属性' : null,
+            card.mappingMissing ? '无序列化属性' : null,
+            imports.length > 0 ? imports.length + ' 个引用' : null
+          ]
+        }),
         NamedBlock('属性', keys, (list) => h('div', { className: 'ue-chip-list' },
           list.map((key) => h('span', { key, className: 'ue-chip' }, key)))),
+        // Cooked USharp data assets keep no properties; what they point at is the only useful
+        // description, so list the import table and let it navigate.
+        NamedBlock('引用的资产', imports, (list) => h('div', { className: 'ue-refs' },
+          list.map((item, index) => h('div', {
+            key: index,
+            className: 'ue-ref' + (item.path ? '' : ' flat'),
+            title: item.path || item.name,
+            onClick: item.path && onPick ? () => onPick(assetPreviewPath(item.path)) : null
+          },
+            h('span', { className: 'ue-ref-name' }, item.name),
+            item.className ? h('span', { className: 'ue-ref-kind' }, item.className) : null)))),
         card.note ? h('div', { className: 'ue-hint' }, card.note) : null)
     }
 
