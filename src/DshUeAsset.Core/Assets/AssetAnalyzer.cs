@@ -22,12 +22,12 @@ public static class AssetAnalyzer
         var hasBlueprintExport = inspect.Exports.Any(e =>
             e.ClassName.Contains("BlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase));
         var card = hasBlueprintExport
-            ? BlueprintCard(props, inspect)
+            ? BlueprintCard(props, inspect, name)
             : className switch
         {
             var c when c.Contains("MaterialInstance", StringComparison.OrdinalIgnoreCase) => MaterialCard(provider, objectPath, props, className, true),
             var c when c.Contains("Material", StringComparison.OrdinalIgnoreCase) && !c.Contains("Expression") => MaterialCard(provider, objectPath, props, className, false),
-            var c when c.Contains("BlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase) => BlueprintCard(props, inspect),
+            var c when c.Contains("BlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase) => BlueprintCard(props, inspect, name),
             var c when c.Contains("DataTable", StringComparison.OrdinalIgnoreCase) => DataTableCard(root),
             var c when c.Contains("Texture", StringComparison.OrdinalIgnoreCase) => TextureCard(provider, objectPath, root, props),
             var c when c.Contains("AnimSequence", StringComparison.OrdinalIgnoreCase) || c.Contains("AnimMontage", StringComparison.OrdinalIgnoreCase) => AnimCard(root, props),
@@ -180,7 +180,7 @@ public static class AssetAnalyzer
         }
     }
 
-    private static JObject BlueprintCard(JObject props, Models.InspectResult inspect)
+    private static JObject BlueprintCard(JObject props, Models.InspectResult inspect, string name)
     {
         var functions = new JArray();
         foreach (var export in inspect.Exports.Where(e => e.ClassName == "Function"))
@@ -207,7 +207,8 @@ public static class AssetAnalyzer
         return new JObject
         {
             ["type"] = "blueprint",
-            ["isAnimBlueprint"] = animNodes.Count > 0,
+            // Cooked anim blueprints keep few properties, so fall back to the naming convention.
+            ["isAnimBlueprint"] = animNodes.Count > 0 || name.StartsWith("ABP_", StringComparison.OrdinalIgnoreCase),
             ["uberGraph"] = props["UberGraphFrame"] is not null,
             ["functions"] = functions,
             ["animGraphNodes"] = animNodes,
