@@ -14,105 +14,114 @@ public static class AssetRegistryCache
 
     private sealed class Entry
     {
-        public Dictionary<string, string> Classes { get; } = new(StringComparer.OrdinalIgnoreCase);
+        // Sized by the caller once the registry length is known: 677k inserts into a growing
+        // dictionary otherwise rehash a dozen times.
+        public Dictionary<string, string> Classes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public Snapshot Snapshot { get; set; } = new(false, 0, null, null);
     }
 
-    private static readonly ConcurrentDictionary<IFileProvider, Entry> Cache = new();
+    // Lazy, not a plain dictionary: publishing an empty entry first made every concurrent caller
+    // see "loaded, but no such asset" while the 340k-entry registry was still parsing, so all kind
+    // resolution silently fell back to filename prefixes.
+    private static readonly ConcurrentDictionary<IFileProvider, Lazy<Entry>> Cache = new();
 
-    public static Snapshot GetStatus(IFileProvider provider)
-    {
-        Ensure(provider);
-        return Cache.TryGetValue(provider, out var entry) ? entry.Snapshot : new Snapshot(false, 0, "not initialized", null);
-    }
+    public static Snapshot GetStatus(IFileProvider provider) => Get(provider).Snapshot;
 
     public static string? GetClass(IFileProvider provider, string path)
     {
-        Ensure(provider);
-        if (!Cache.TryGetValue(provider, out var entry)) return null;
         var key = Normalize(path);
-        return entry.Classes.TryGetValue(key, out var value) ? value : null;
+        return Get(provider).Classes.TryGetValue(key, out var value) ? value : null;
     }
 
-    private static void Ensure(IFileProvider provider)
+    private static Entry Get(IFileProvider provider) =>
+        Cache.GetOrAdd(provider, p => new Lazy<Entry>(() => Load(p), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+
+    private static Entry Load(IFileProvider provider)
     {
-        if (Cache.ContainsKey(provider)) return;
         var entry = new Entry();
-        Cache[provider] = entry;
-        lock (entry)
+        try
         {
-            try
+            var (contentPrefix, registryPath) = ScanFiles(provider);
+            if (registryPath is null)
             {
-                var registryPath = FindRegistry(provider);
-                if (registryPath is null)
-                {
-                    entry.Snapshot = new Snapshot(false, 0, "AssetRegistry.bin not found", null);
-                    return;
-                }
+                entry.Snapshot = new Snapshot(false, 0, "AssetRegistry.bin not found", null);
+                return entry;
+            }
 
-                if (!provider.TryCreateReader(registryPath, out var reader))
-                    throw new InvalidOperationException("cannot open " + registryPath);
+            if (!provider.TryCreateReader(registryPath, out var reader))
+                throw new InvalidOperationException("cannot open " + registryPath);
 
-                using (reader)
+            using (reader)
+            {
+                var state = new FAssetRegistryState(reader);
+                var assets = state.PreallocatedAssetDataBuffers;
+                entry.Classes = new Dictionary<string, string>(Math.Max(1024, assets.Length * 2), StringComparer.OrdinalIgnoreCase);
+                foreach (var asset in assets)
                 {
-                    var state = new FAssetRegistryState(reader);
-                    var contentPrefix = DetectContentPrefix(provider);
-                    foreach (var asset in state.PreallocatedAssetDataBuffers)
+                    var package = asset.PackageName.Text;
+                    if (string.IsNullOrWhiteSpace(package)) continue;
+                    var className = asset.AssetClass.Text;
+                    var assetName = asset.AssetName.Text;
+
+                    // Only the virtual form is ever queried (AssetKind.Resolve passes provider
+                    // paths), so the raw "/Game/..." keys are not stored: that halves the table.
+                    if (contentPrefix is not null && package.StartsWith("/Game/", StringComparison.OrdinalIgnoreCase))
                     {
-                        var package = asset.PackageName.Text;
-                        if (string.IsNullOrWhiteSpace(package)) continue;
-                        var className = asset.AssetClass.Text;
-                        entry.Classes[Normalize(package)] = className;
-                        entry.Classes[Normalize(package + "." + asset.AssetName.Text)] = className;
-
-                        // Registry paths are mount-point relative (/Game/...); the provider uses
-                        // virtual paths (b1/Content/...). Store both forms.
-                        if (contentPrefix is not null && package.StartsWith("/Game/", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var virtualPath = contentPrefix + package[6..];
-                            entry.Classes[Normalize(virtualPath)] = className;
-                            entry.Classes[Normalize(virtualPath + "." + asset.AssetName.Text)] = className;
-                        }
+                        var virtualPath = contentPrefix + package[6..];
+                        entry.Classes[virtualPath] = className;
+                        entry.Classes[virtualPath + "." + assetName] = className;
+                    }
+                    else
+                    {
+                        entry.Classes[package] = className;
+                        entry.Classes[package + "." + assetName] = className;
                     }
                 }
+            }
 
-                entry.Snapshot = new Snapshot(true, entry.Classes.Count, null, DateTimeOffset.Now);
-            }
-            catch (Exception ex)
-            {
-                entry.Snapshot = new Snapshot(false, 0, ex.Message, null);
-            }
+            entry.Snapshot = new Snapshot(true, entry.Classes.Count, null, DateTimeOffset.Now);
         }
-    }
-
-    private static string? FindRegistry(IFileProvider provider)
-    {
-        foreach (var path in provider.Files.Keys)
+        catch (Exception ex)
         {
-            if (path.EndsWith("AssetRegistry.bin", StringComparison.OrdinalIgnoreCase))
-                return path;
+            entry.Snapshot = new Snapshot(false, 0, ex.Message, null);
         }
-        return null;
+
+        return entry;
     }
 
-    private static string? DetectContentPrefix(IFileProvider provider)
+    /// <summary>
+    /// One pass over the file list yields both the registry path and the project mount point; the
+    /// provider holds half a million keys and scanning them twice was measurable.
+    /// </summary>
+    private static (string? ContentPrefix, string? RegistryPath) ScanFiles(IFileProvider provider)
     {
+        string? contentPrefix = null;
+        string? registryPath = null;
         var scanned = 0;
         foreach (var path in provider.Files.Keys)
         {
-            var index = path.IndexOf("/Content/", StringComparison.OrdinalIgnoreCase);
-            if (index > 0)
+            if (registryPath is null && path.EndsWith("AssetRegistry.bin", StringComparison.OrdinalIgnoreCase))
             {
-                return path[..(index + "/Content/".Length)];
+                registryPath = path;
+                if (contentPrefix is not null) break;
             }
-            if (++scanned > 5000) break;
+
+            if (contentPrefix is null)
+            {
+                var index = path.IndexOf("/Content/", StringComparison.OrdinalIgnoreCase);
+                if (index > 0) contentPrefix = path[..(index + "/Content/".Length)];
+            }
+
+            if (contentPrefix is not null && registryPath is not null) break;
+            if (++scanned > 200_000) break;
         }
-        return null;
+
+        return (contentPrefix, registryPath);
     }
 
     private static string Normalize(string path)
     {
-        var value = path.Replace('\\', '/').TrimEnd();
+        var value = path.IndexOf('\\') >= 0 ? path.Replace('\\', '/') : path;
         if (value.EndsWith(".uasset", StringComparison.OrdinalIgnoreCase)) value = value[..^7];
         return value;
     }

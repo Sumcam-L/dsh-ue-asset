@@ -347,6 +347,24 @@ public sealed class AssetService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Diagnostic: what AssetRegistry.bin says about one path, and how the registry loaded.
+    /// </summary>
+    public object RegistryClass(string sessionId, string path)
+    {
+        var session = Sessions.Get(sessionId);
+        var status = AssetRegistryCache.GetStatus(session.Provider);
+        var className = AssetRegistryCache.GetClass(session.Provider, path);
+        return new
+        {
+            className,
+            kind = className is null ? null : AssetKind.ClassToKind(className),
+            loaded = status.Loaded,
+            count = status.Count,
+            error = status.Error
+        };
+    }
+
     public IReadOnlyList<TreeEntry> ListAnimations(string sessionId, string meshPath, string? prefix, string? query, int limit)
     {
         var session = Sessions.Get(sessionId);

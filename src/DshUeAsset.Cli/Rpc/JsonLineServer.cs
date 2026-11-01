@@ -151,6 +151,9 @@ public sealed class JsonLineServer
                     Optional(p, "query"),
                     Int(p, "limit", 100));
 
+            case "registryClass":
+                return _service.RegistryClass(Required(p, "sessionId"), Required(p, "path"));
+
             case "asset":
                 return await _service.AnalyzeAsync(
                     Required(p, "sessionId"),
