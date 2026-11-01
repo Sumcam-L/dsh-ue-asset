@@ -34,7 +34,8 @@ public static class AssetKind
         ("GE_", "gameplay_effect"),
         ("GA_", "gameplay_ability"),
         ("W_", "world"),
-        ("S_", "sound")
+        ("SW_", "sound"),
+        ("SC_", "sound")
     ];
 
     public static IReadOnlyList<PrefixRule> BuiltInRules =>

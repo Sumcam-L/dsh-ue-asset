@@ -28,9 +28,13 @@ public static class AssetAnalyzer
             var c when c.Contains("MaterialInstance", StringComparison.OrdinalIgnoreCase) => MaterialCard(provider, objectPath, props, className, true),
             var c when c.Contains("Material", StringComparison.OrdinalIgnoreCase) && !c.Contains("Expression") => MaterialCard(provider, objectPath, props, className, false),
             var c when c.Contains("BlueprintGeneratedClass", StringComparison.OrdinalIgnoreCase) => BlueprintCard(props, inspect),
-            var c when c.Contains("DataTable", StringComparison.OrdinalIgnoreCase) => DataTableCard(props),
-            var c when c.Contains("Texture", StringComparison.OrdinalIgnoreCase) => TextureCard(provider, objectPath, props),
-            var c when c.Contains("AnimSequence", StringComparison.OrdinalIgnoreCase) || c.Contains("AnimMontage", StringComparison.OrdinalIgnoreCase) => AnimCard(props),
+            var c when c.Contains("DataTable", StringComparison.OrdinalIgnoreCase) => DataTableCard(root),
+            var c when c.Contains("Texture", StringComparison.OrdinalIgnoreCase) => TextureCard(provider, objectPath, root, props),
+            var c when c.Contains("AnimSequence", StringComparison.OrdinalIgnoreCase) || c.Contains("AnimMontage", StringComparison.OrdinalIgnoreCase) => AnimCard(root, props),
+            var c when c.Contains("SkeletalMesh", StringComparison.OrdinalIgnoreCase) => MeshCard(root, props, skeletal: true),
+            var c when c.Contains("StaticMesh", StringComparison.OrdinalIgnoreCase) => MeshCard(root, props, skeletal: false),
+            var c when c.Contains("Skeleton", StringComparison.OrdinalIgnoreCase) => SkeletonCard(root, props),
+            var c when c.Contains("SoundWave", StringComparison.OrdinalIgnoreCase) || c.Contains("SoundCue", StringComparison.OrdinalIgnoreCase) => SoundCard(root, props),
             _ => GenericCard(props, inspect)
         };
 
@@ -214,36 +218,70 @@ public static class AssetAnalyzer
         };
     }
 
-    private static JObject DataTableCard(JObject props)
+    // CUE4Parse writes the parsed rows to a root-level "Rows" member (UDataTable.WriteJson),
+    // not to Properties, so the row data is only reachable from the whole document.
+    private const int TableRowLimit = 50;
+
+    private static JObject DataTableCard(JObject root)
     {
-        var rows = props["RowMap"] as JObject;
-        var sample = new JArray();
+        var rows = root["Rows"] as JObject;
+        var columns = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var list = new JArray();
         if (rows is not null)
-            foreach (var row in rows.Properties().Take(5))
-                sample.Add(new JObject
-                {
-                    ["row"] = row.Name,
-                    ["fields"] = row.Value is JObject o ? new JArray(o.Properties().Select(p => p.Name)) : new JArray()
-                });
+            foreach (var row in rows.Properties().Take(TableRowLimit))
+            {
+                var values = new JObject();
+                if (row.Value is JObject fields)
+                    foreach (var field in fields.Properties())
+                    {
+                        columns.Add(field.Name);
+                        values[field.Name] = Shorten(field.Value);
+                    }
+                list.Add(new JObject { ["row"] = row.Name, ["values"] = values });
+            }
 
         return new JObject
         {
             ["type"] = "data_table",
-            ["rowStruct"] = ObjectPathOf(props["RowStruct"]),
-            ["rowCount"] = rows?.Count,
-            ["sample"] = sample,
-            ["truncatedRows"] = rows is null
+            ["rowStruct"] = ObjectPathOf(root["Properties"]?["RowStruct"]),
+            ["rowCount"] = rows?.Count ?? 0,
+            ["columns"] = new JArray(columns),
+            ["rows"] = list,
+            ["truncatedRows"] = rows is not null && rows.Count > TableRowLimit
         };
     }
 
-    private static JObject TextureCard(IFileProvider provider, string objectPath, JObject props)
+    /// <summary>Table cells keep their JSON shape unless it is too long to render.</summary>
+    private static JToken Shorten(JToken value)
     {
+        switch (value.Type)
+        {
+            case JTokenType.Object:
+            case JTokenType.Array:
+                var json = value.ToString(Newtonsoft.Json.Formatting.None);
+                return json.Length <= 160 ? value.DeepClone() : json[..160] + "…";
+            case JTokenType.String:
+                var text = value.ToString();
+                return text.Length <= 160 ? value.DeepClone() : text[..160] + "…";
+            default:
+                return value.DeepClone();
+        }
+    }
+
+    private static JObject TextureCard(IFileProvider provider, string objectPath, JObject root, JObject props)
+    {
+        // On a cooked Texture2D the dimensions and pixel format sit on the object itself;
+        // Properties only carries the import settings.
         var card = new JObject
         {
             ["type"] = "texture",
-            ["width"] = props["SizeX"]?.ToObject<int?>(),
-            ["height"] = props["SizeY"]?.ToObject<int?>(),
-            ["format"] = props["PixelFormat"]?.ToString() ?? props["Format"]?.ToString()
+            ["width"] = root["SizeX"]?.ToObject<int?>() ?? props["SizeX"]?.ToObject<int?>(),
+            ["height"] = root["SizeY"]?.ToObject<int?>() ?? props["SizeY"]?.ToObject<int?>(),
+            ["format"] = root["PixelFormat"]?.ToString() ?? props["PixelFormat"]?.ToString() ?? props["Format"]?.ToString(),
+            ["compression"] = props["CompressionSettings"]?.ToString(),
+            ["srgb"] = props["sRGB"]?.ToObject<bool?>(),
+            ["virtual"] = props["VirtualTextureStreaming"]?.ToObject<bool?>(),
+            ["mipZero"] = root["FirstMipToSerialize"]?.ToObject<int?>()
         };
         try
         {
@@ -263,14 +301,154 @@ public static class AssetAnalyzer
         return card;
     }
 
-    private static JObject AnimCard(JObject props) => new()
+    private static JObject AnimCard(JObject root, JObject props)
     {
-        ["type"] = "animation",
-        ["length"] = props["SequenceLength"]?.ToObject<double?>(),
-        ["rateScale"] = props["RateScale"]?.ToObject<double?>(),
-        ["skeleton"] = ObjectPathOf(props["Skeleton"]),
-        ["notifyCount"] = (props["Notifies"] as JArray)?.Count
-    };
+        double? fps = null;
+        if (props["TargetFrameRate"] is JObject rate && rate["Numerator"]?.ToObject<double?>() is { } numerator && numerator > 0)
+        {
+            var denominator = rate["Denominator"]?.ToObject<double?>() ?? 1;
+            if (denominator > 0) fps = numerator / denominator;
+        }
+        if (fps is null && props["RateScale"]?.ToObject<double?>() is { } scale && scale > 0) fps = scale;
+
+        var structure = root["CompressedDataStructure"];
+        return new JObject
+        {
+            ["type"] = "animation",
+            ["length"] = props["SequenceLength"]?.ToObject<double?>(),
+            ["fps"] = fps is > 0 ? Math.Round(fps.Value, 2) : null,
+            ["frames"] = structure?["CompressedNumberOfFrames"]?.ToObject<int?>(),
+            ["rateScale"] = props["RateScale"]?.ToObject<double?>(),
+            ["skeleton"] = ObjectPathOf(props["Skeleton"]),
+            ["notifyCount"] = (props["Notifies"] as JArray)?.Count,
+            ["tracks"] = (root["CompressedTrackToSkeletonMapTable"] as JArray)?.Count,
+            ["compression"] = structure?["KeyEncodingFormat"]?.ToString(),
+            ["compressedBytes"] = root["CompressedRawDataSize"]?.ToObject<long?>()
+        };
+    }
+
+    private static JObject MeshCard(JObject root, JObject props, bool skeletal)
+    {
+        var slots = props["StaticMaterials"] as JArray ?? props["SkeletalMaterials"] as JArray;
+        var materials = new JArray();
+        if (slots is not null)
+            foreach (var item in slots.OfType<JObject>())
+                materials.Add(new JObject
+                {
+                    ["slot"] = item["MaterialSlotName"]?.ToString() ?? item["ImportedMaterialSlotName"]?.ToString(),
+                    ["path"] = ObjectPathOf(item["MaterialInterface"])
+                });
+
+        // RenderData survives cooking and carries per-LOD sections, so triangle and vertex
+        // counts are derivable even though the mesh itself is not loaded.
+        var lods = root["RenderData"]?["LODs"] as JArray;
+        long triangles = 0;
+        long vertices = 0;
+        if (lods is not null)
+            foreach (var lod in lods.OfType<JObject>())
+            {
+                if (lod["Sections"] is not JArray sections) continue;
+                var maxIndex = -1;
+                foreach (var section in sections.OfType<JObject>())
+                {
+                    triangles += section["NumTriangles"]?.ToObject<long?>() ?? 0;
+                    var top = section["MaxVertexIndex"]?.ToObject<int?>() ?? -1;
+                    if (top > maxIndex) maxIndex = top;
+                }
+                vertices += maxIndex + 1;
+            }
+
+        var card = new JObject
+        {
+            ["type"] = "mesh",
+            ["meshKind"] = skeletal ? "skeletal" : "static",
+            ["materialSlots"] = materials,
+            ["lodCount"] = lods?.Count,
+            ["triangles"] = lods is null ? null : triangles,
+            ["vertices"] = lods is null ? null : vertices,
+            ["collision"] = root["BodySetup"] is not null
+        };
+
+        if (skeletal)
+        {
+            card["bones"] = (props["BoneTree"] as JArray)?.Count
+                            ?? (root["ReferenceSkeleton"]?["FinalRefBoneInfo"] as JArray)?.Count;
+            card["sockets"] = Names(props["Sockets"]);
+            card["slotGroups"] = new JArray((props["SlotGroups"] as JArray ?? new JArray())
+                .OfType<JObject>()
+                .Select(group => group["GroupName"]?.ToString())
+                .Where(name => !string.IsNullOrWhiteSpace(name)));
+        }
+
+        if (props["ExtendedBounds"] is JObject bounds && bounds["BoxExtent"] is JObject extent)
+            card["extent"] = new JObject
+            {
+                ["x"] = extent["X"]?.ToObject<double?>(),
+                ["y"] = extent["Y"]?.ToObject<double?>(),
+                ["z"] = extent["Z"]?.ToObject<double?>()
+            };
+
+        return card;
+    }
+
+    private static JObject SkeletonCard(JObject root, JObject props)
+    {
+        var bones = new JArray();
+        if (root["ReferenceSkeleton"]?["FinalRefBoneInfo"] is JArray info)
+            bones = new JArray(info.OfType<JObject>()
+                .Select(bone => bone["Name"]?.ToString())
+                .Where(name => !string.IsNullOrWhiteSpace(name)));
+        else if (props["BoneTree"] is JArray tree)
+            bones = new JArray(tree.Count == 0 ? Array.Empty<string>() : Enumerable.Repeat("(unnamed)", tree.Count));
+
+        return new JObject
+        {
+            ["type"] = "skeleton",
+            ["boneCount"] = bones.Count,
+            ["bones"] = bones,
+            ["sockets"] = Names(props["Sockets"]),
+            ["slotGroups"] = new JArray((props["SlotGroups"] as JArray ?? new JArray())
+                .OfType<JObject>()
+                .Select(group => group["GroupName"]?.ToString())
+                .Where(name => !string.IsNullOrWhiteSpace(name)))
+        };
+    }
+
+    private static JObject SoundCard(JObject root, JObject props)
+    {
+        var platform = root["RunningPlatformData"];
+        var chunks = platform?["Chunks"] as JArray;
+        long bytes = 0;
+        if (chunks is not null)
+            foreach (var chunk in chunks.OfType<JObject>())
+                bytes += chunk["DataSize"]?.ToObject<long?>() ?? 0;
+
+        var channels = props["NumChannels"]?.ToObject<int?>();
+        var sampleRate = props["SampleRate"]?.ToObject<int?>();
+        var duration = props["Duration"]?.ToObject<double?>();
+
+        return new JObject
+        {
+            ["type"] = "sound",
+            ["duration"] = duration,
+            ["channels"] = channels,
+            ["sampleRate"] = sampleRate,
+            ["volume"] = props["Volume"]?.ToObject<double?>(),
+            ["looping"] = props["bLooping"]?.ToObject<bool?>(),
+            ["quality"] = props["CompressionQuality"]?.ToObject<int?>(),
+            ["format"] = platform?["AudioFormat"]?.ToString(),
+            ["chunks"] = chunks?.Count,
+            ["bytes"] = chunks is null ? null : bytes,
+            ["kbps"] = channels is > 0 && sampleRate is > 0 && duration is > 0 && chunks is not null
+                ? Math.Round(bytes * 8.0 / duration.Value / 1000.0, 1)
+                : null
+        };
+    }
+
+    private static JArray Names(JToken? token) => new((token as JArray ?? new JArray())
+        .OfType<JObject>()
+        .Select(item => item["ObjectName"]?.ToString() ?? item["ObjectPath"]?.ToString())
+        .Where(name => !string.IsNullOrWhiteSpace(name)));
 
     private static JObject GenericCard(JObject props, Models.InspectResult inspect)
     {

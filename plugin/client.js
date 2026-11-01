@@ -273,6 +273,23 @@ window.__ModuleLoader__.load({
       .ue-param-k { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-secondary); }
       .ue-param-v { flex:none; font-family:var(--dsw-font-mono,ui-monospace,monospace); font-variant-numeric:tabular-nums; }
       .ue-swatch { width:10px; height:10px; border-radius:3px; border:1px solid rgba(128,128,128,.4); flex:none; }
+      .ue-metrics { display:grid; grid-template-columns:repeat(auto-fill, minmax(148px, 1fr)); gap:3px 10px; }
+      .ue-metric { display:flex; align-items:baseline; gap:6px; font-size:11px; min-width:0; }
+      .ue-metric-k { flex:none; color:var(--dsw-alias-label-tertiary); }
+      .ue-metric-v { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums; }
+      .ue-metric-link { color:var(--dsw-alias-brand-primary, #4c8dff); cursor:pointer; }
+      .ue-metric-link:hover { text-decoration:underline; }
+      .ue-tablewrap { overflow:auto; max-height:380px; border:1px solid var(--dsw-alias-border-l1); border-radius:8px; background:var(--dsw-alias-bg-layer-1); }
+      .ue-table { border-collapse:collapse; font-size:10.5px; width:max-content; min-width:100%; }
+      .ue-table th { position:sticky; top:0; z-index:1; text-align:left; font-weight:600; font-size:10px; padding:4px 5px; white-space:nowrap; color:var(--dsw-alias-label-secondary); background:var(--dsw-alias-bg-layer-2); border-bottom:1px solid var(--dsw-alias-border-l1); }
+      .ue-table td { padding:3px 5px; border-bottom:1px solid var(--dsw-alias-border-l1); white-space:nowrap; font-variant-numeric:tabular-nums; cursor:copy; }
+      .ue-table tr:last-child td { border-bottom:0; }
+      .ue-table tbody tr:hover td { background:var(--dsw-alias-bg-layer-2); }
+      .ue-table td.ue-cell-row { color:var(--dsw-alias-label-secondary); font-weight:600; cursor:default; }
+      .ue-table th:last-child, .ue-table td:last-child { padding-right:14px; }
+      .ue-chip-list { display:flex; flex-wrap:wrap; gap:4px; }
+      .ue-bone-list { display:flex; flex-wrap:wrap; gap:4px; max-height:190px; overflow:auto; }
+      .ue-bone { font-size:10px; padding:1px 6px; border-radius:4px; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-secondary); font-family:var(--dsw-font-mono, ui-monospace, monospace); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .ue-typebar { display:flex; align-items:center; gap:6px; padding:2px 2px 0; font-size:11px; color:var(--dsw-alias-label-secondary); }
       .ue-viewswitch { margin-left:auto; display:flex; gap:2px; background:var(--dsw-alias-bg-layer-1); border-radius:6px; padding:2px; flex:none; }
       .ue-seg { border:0; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; }
@@ -1210,7 +1227,7 @@ window.__ModuleLoader__.load({
 
     // The preview payload for non-raster assets only carries size/export counts, which is nearly
     // no information. /asset returns the typed card (parents, textures, parameters), so render that.
-    function AssetCardView(props) {
+    function MaterialCardView(props) {
       const card = props.card;
       const onPick = props.onPick;
       const [filter, setFilter] = useState('');
@@ -1297,6 +1314,249 @@ window.__ModuleLoader__.load({
       );
     }
 
+    function cellText(value) {
+      if (value === null || value === undefined) return ''
+      if (typeof value === 'object') {
+        try { return JSON.stringify(value) } catch (error) { return String(value) }
+      }
+      if (typeof value === 'number' && !Number.isInteger(value)) return String(Math.round(value * 1000) / 1000)
+      return String(value)
+    }
+
+    function copyText(text, pushToast) {
+      if (!text) return
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text)
+          if (pushToast) pushToast('已复制 ' + (text.length > 24 ? text.slice(0, 24) + '…' : text))
+        }
+      } catch (error) {
+        // Clipboard access can be refused; copying is a convenience, not the point of the card.
+      }
+    }
+
+    // Small label/value grid shared by the non-material cards.
+    function MetricList(props) {
+      const items = (props.items || []).filter((item) => item && item.value !== null && item.value !== undefined && item.value !== '')
+      if (items.length === 0) return null
+      return h('div', { className: 'ue-metrics' }, items.map((item, index) => h('div', { key: index, className: 'ue-metric' },
+        h('span', { className: 'ue-metric-k' }, item.label),
+        item.onClick
+          ? h('span', { className: 'ue-metric-v ue-metric-link', title: item.title || String(item.value), onClick: item.onClick }, String(item.value))
+          : h('span', { className: 'ue-metric-v', title: item.title || '' }, String(item.value)))))
+    }
+
+    function ChipRow(props) {
+      const chips = (props.chips || []).filter(Boolean)
+      if (chips.length === 0) return null
+      return h('div', { className: 'ue-card-row' }, chips.map((chip, index) => h('span', { key: index, className: 'ue-chip' }, chip)))
+    }
+
+    function NamedBlock(label, items, render) {
+      const list = (items || []).filter(Boolean)
+      if (list.length === 0) return null
+      return h('div', { className: 'ue-card-block' },
+        h('div', { className: 'ue-card-label' }, label + ' ' + list.length),
+        render(list))
+    }
+
+    function DataTableCardView(props) {
+      const card = props.card || {}
+      const [filter, setFilter] = useState('')
+      const columns = Array.isArray(card.columns) ? card.columns : []
+      const rows = Array.isArray(card.rows) ? card.rows : []
+      const term = filter.trim().toLowerCase()
+      const shown = term
+        ? rows.filter((row) => {
+            if (String(row.row || '').toLowerCase().indexOf(term) >= 0) return true
+            const values = row.values || {}
+            return columns.some((column) => cellText(values[column]).toLowerCase().indexOf(term) >= 0)
+          })
+        : rows
+
+      if (rows.length === 0) {
+        return h('div', { className: 'ue-card' },
+          h(ChipRow, { chips: [card.rowStruct ? assetLeafName(card.rowStruct) : null, card.rowCount ? card.rowCount + ' 行' : null] }),
+          h('div', { className: 'ue-hint' }, '这张表没有行数据：烘焙包里没有序列化行，或者行结构映射缺失。'))
+      }
+
+      return h('div', { className: 'ue-card' },
+        h(ChipRow, { chips: [card.rowStruct ? assetLeafName(card.rowStruct) : null, card.rowCount + ' 行'] }),
+        h('div', { className: 'ue-card-block' },
+          h('div', { className: 'ue-card-row' },
+            h('div', { className: 'ue-card-label' }, '显示 ' + shown.length + ' / ' + rows.length + (card.truncatedRows ? '（只读取前 ' + rows.length + ' 行）' : '')),
+            h('input', {
+              className: 'ue-param-filter',
+              value: filter,
+              placeholder: '过滤行',
+              onChange: (event) => setFilter(event.target.value)
+            })),
+          h('div', { className: 'ue-tablewrap' },
+            h('table', { className: 'ue-table' },
+              h('thead', null, h('tr', null,
+                h('th', null, 'Row'),
+                columns.map((column) => h('th', { key: column }, column)))),
+              h('tbody', null, shown.map((row) => {
+                const values = row.values || {}
+                return h('tr', { key: row.row },
+                  h('td', { className: 'ue-cell-row', title: row.row }, row.row),
+                  columns.map((column) => {
+                    const text = cellText(values[column])
+                    return h('td', {
+                      key: column,
+                      title: text,
+                      onClick: () => copyText(text, props.pushToast)
+                    }, text || '—')
+                  }))
+              }))))))
+    }
+
+    function BlueprintCardView(props) {
+      const card = props.card || {}
+      const functions = (Array.isArray(card.functions) ? card.functions : [])
+        .map((item) => (item && item.name) || String(item || '')).filter(Boolean)
+      const components = (Array.isArray(card.components) ? card.components : []).filter(Boolean)
+      const interfaces = (Array.isArray(card.interfaces) ? card.interfaces : []).filter(Boolean)
+      const nodes = (Array.isArray(card.animGraphNodes) ? card.animGraphNodes : []).filter(Boolean)
+      const empty = functions.length === 0 && components.length === 0 && interfaces.length === 0 && nodes.length === 0
+
+      return h('div', { className: 'ue-card' },
+        h(ChipRow, { chips: [card.isAnimBlueprint ? '动画蓝图' : '蓝图类', card.uberGraph ? '有 Ubergraph' : null, card.cdoExport ? '含 CDO' : null] }),
+        NamedBlock('函数', functions, (list) => h('div', { className: 'ue-chip-list' },
+          list.map((name) => h('span', { key: name, className: 'ue-chip' }, name)))),
+        NamedBlock('组件', components, (list) => h('div', { className: 'ue-chip-list' },
+          list.map((name) => h('span', { key: name, className: 'ue-chip' }, name)))),
+        NamedBlock('接口', interfaces, (list) => h('div', { className: 'ue-chip-list' },
+          list.map((path) => h('span', { key: path, className: 'ue-chip', title: path }, assetLeafName(path))))),
+        NamedBlock('AnimGraph 节点', nodes, (list) => h('div', { className: 'ue-chip-list' },
+          list.map((name) => h('span', { key: name, className: 'ue-chip' }, name)))),
+        empty ? h('div', { className: 'ue-hint' }, card.note || '这个蓝图没有序列化出函数或组件。') : null)
+    }
+
+    function TextureCardView(props) {
+      const card = props.card || {}
+      const area = card.width && card.height
+        ? Math.round(card.width * card.height / 10000) / 100 + ' MP'
+        : null
+      return h('div', { className: 'ue-card' },
+        h(ChipRow, { chips: [card.virtual ? '虚拟纹理' : null, card.srgb === false ? '线性空间' : (card.srgb ? 'sRGB' : null)] }),
+        h(MetricList, { items: [
+          { label: '尺寸', value: card.width && card.height ? card.width + ' × ' + card.height : null },
+          { label: '像素量', value: area },
+          { label: '像素格式', value: card.format },
+          { label: '压缩', value: card.compression ? materialEnumName(card.compression) : null },
+          { label: '起始 mip', value: card.mipZero }
+        ] }))
+    }
+
+    function AnimationCardView(props) {
+      const card = props.card || {}
+      const onPick = props.onPick
+      const skeleton = card.skeleton ? assetPreviewPath(card.skeleton) : null
+      return h('div', { className: 'ue-card' },
+        h(ChipRow, { chips: [card.frames ? card.frames + ' 帧' : null, card.compression ? materialEnumName(card.compression) : null] }),
+        h(MetricList, { items: [
+          { label: '时长', value: card.length !== null && card.length !== undefined ? Math.round(card.length * 1000) / 1000 + ' s' : null },
+          { label: '帧率', value: card.fps ? card.fps + ' fps' : null },
+          { label: '帧数', value: card.frames },
+          { label: '轨道', value: card.tracks },
+          { label: '通知', value: card.notifyCount },
+          {
+            label: '骨骼',
+            value: skeleton ? assetLeafName(skeleton) : null,
+            title: skeleton || '',
+            onClick: skeleton && onPick ? () => onPick(skeleton) : null
+          }
+        ] }))
+    }
+
+    function MeshCardView(props) {
+      const card = props.card || {}
+      const onPick = props.onPick
+      const slots = (Array.isArray(card.materialSlots) ? card.materialSlots : []).filter(Boolean)
+      const sockets = (Array.isArray(card.sockets) ? card.sockets : []).filter(Boolean)
+      const extent = card.extent || {}
+      const size = extent.x !== null && extent.x !== undefined
+        ? [extent.x, extent.y, extent.z].map((value) => Math.round(value * 10) / 10).join(' × ') + ' cm'
+        : null
+
+      return h('div', { className: 'ue-card' },
+        h(ChipRow, { chips: [card.meshKind === 'skeletal' ? '骨骼网格' : '静态网格', card.collision ? '有碰撞体' : null] }),
+        h(MetricList, { items: [
+          { label: 'LOD', value: card.lodCount },
+          { label: '三角形', value: card.triangles !== null && card.triangles !== undefined ? card.triangles.toLocaleString() : null },
+          { label: '顶点', value: card.vertices !== null && card.vertices !== undefined ? card.vertices.toLocaleString() : null },
+          { label: '包围盒', value: size },
+          { label: '骨骼', value: card.bones },
+          { label: '插槽', value: sockets.length || null }
+        ] }),
+        NamedBlock('材质槽', slots, (list) => h('div', { className: 'ue-tex-grid' },
+          list.map((item, index) => h('div', {
+            key: index,
+            className: 'ue-tex',
+            title: (item.slot || '') + '\n' + (item.path || ''),
+            onClick: item.path && onPick ? () => onPick(assetPreviewPath(item.path)) : null
+          },
+            h('div', { className: 'ue-tex-file' }, item.slot || 'Slot ' + index),
+            h('div', { className: 'ue-tex-name' }, assetLeafName(item.path || '')))))),
+        NamedBlock('插槽', sockets, (list) => h('div', { className: 'ue-bone-list' },
+          list.map((name, index) => h('span', { key: index, className: 'ue-bone', title: name }, assetLeafName(name))))))
+    }
+
+    function SkeletonCardView(props) {
+      const card = props.card || {}
+      const bones = (Array.isArray(card.bones) ? card.bones : []).filter(Boolean)
+      const sockets = (Array.isArray(card.sockets) ? card.sockets : []).filter(Boolean)
+      const groups = (Array.isArray(card.slotGroups) ? card.slotGroups : []).filter(Boolean)
+      return h('div', { className: 'ue-card' },
+        h(ChipRow, { chips: [bones.length ? bones.length + ' 骨骼' : null, sockets.length ? sockets.length + ' 插槽' : null, groups.length ? groups.join(' / ') : null] }),
+        NamedBlock('骨骼', bones, (list) => h('div', { className: 'ue-bone-list' },
+          list.map((name, index) => h('span', { key: index, className: 'ue-bone' }, name)))),
+        NamedBlock('插槽', sockets, (list) => h('div', { className: 'ue-bone-list' },
+          list.map((name, index) => h('span', { key: index, className: 'ue-bone', title: name }, assetLeafName(name))))) )
+    }
+
+    function SoundCardView(props) {
+      const card = props.card || {}
+      const channels = card.channels === 2 ? '立体声' : (card.channels === 1 ? '单声道' : (card.channels || null))
+      return h('div', { className: 'ue-card' },
+        h(ChipRow, { chips: [card.format, card.looping ? '循环' : null] }),
+        h(MetricList, { items: [
+          { label: '时长', value: card.duration !== null && card.duration !== undefined ? Math.round(card.duration * 1000) / 1000 + ' s' : null },
+          { label: '采样率', value: card.sampleRate ? card.sampleRate.toLocaleString() + ' Hz' : null },
+          { label: '声道', value: channels },
+          { label: '码率', value: card.kbps ? card.kbps + ' kbps' : null },
+          { label: '数据量', value: card.bytes ? fmtSize(card.bytes) : null },
+          { label: '分块', value: card.chunks },
+          { label: '音量', value: card.volume }
+        ] }))
+    }
+
+    function GenericCardView(props) {
+      const card = props.card || {}
+      const keys = (Array.isArray(card.propertyKeys) ? card.propertyKeys : []).filter(Boolean)
+      return h('div', { className: 'ue-card' },
+        h(ChipRow, { chips: [card.propertyCount !== null && card.propertyCount !== undefined ? card.propertyCount + ' 个属性' : null, card.mappingMissing ? '映射缺失' : null] }),
+        NamedBlock('属性', keys, (list) => h('div', { className: 'ue-chip-list' },
+          list.map((key) => h('span', { key, className: 'ue-chip' }, key)))),
+        card.note ? h('div', { className: 'ue-hint' }, card.note) : null)
+    }
+
+    function AssetCardView(props) {
+      const card = props.card
+      if (!card || typeof card !== 'object') return null
+      const type = card.type || 'generic'
+      if (type === 'material') return h(MaterialCardView, props)
+      if (type === 'data_table') return h(DataTableCardView, props)
+      if (type === 'blueprint') return h(BlueprintCardView, props)
+      if (type === 'texture') return h(TextureCardView, props)
+      if (type === 'animation') return h(AnimationCardView, props)
+      if (type === 'mesh') return h(MeshCardView, props)
+      if (type === 'skeleton') return h(SkeletonCardView, props)
+      if (type === 'sound') return h(SoundCardView, props)
+      return h(GenericCardView, props)
+    }
+
     function PreviewTab(props) {
       const { sessionId, path, pushToast, onPick, onBack, onForward, canBack, canForward } = props;
       const [data, setData] = useState(null);
@@ -1370,10 +1630,10 @@ window.__ModuleLoader__.load({
         return () => { cancelled = true; };
       }, [sessionId, path, data && data.kind]);
 
-      // Non-raster assets preview as properties; fetch the typed card so the pane shows the
-      // parent chain, texture slots and parameters instead of four counters.
+      // Fetch the typed card for every kind: meshes and textures keep their preview above, but the
+      // card is where LOD/materials and size/pixel-format live.
       useEffect(() => {
-        if (!path || !data || data.kind !== 'properties') { setCard(null); return undefined; }
+        if (!path || !data) { setCard(null); return undefined; }
         let cancelled = false;
         api('/asset', { sessionId, path })
           .then((result) => { if (!cancelled) setCard(result || null); })
@@ -1491,12 +1751,15 @@ window.__ModuleLoader__.load({
                     h('div', { className: 'ue-pp-meta' },
                       h('span', { className: 'ue-chip' }, '[' + ((data && data.className) || '?') + ']'),
                       data && data.kind ? h('span', { className: 'ue-chip' }, data.kind) : null,
-                      data && data.width ? h('span', { className: 'ue-chip' }, data.width + '×' + data.height) : null),
+                      // The preview bitmap can be downscaled; the card reports the real texture size.
+        data && data.width
+          ? h('span', { className: 'ue-chip' }, (card && card.card && card.card.width ? card.card.width : data.width) + '×' + (card && card.card && card.card.height ? card.card.height : data.height))
+          : null),
                     jsonView
                       ? (rawView.loading
                           ? h('div', { className: 'ue-hint' }, '读取完整属性…')
                           : h(JsonView, { text: rawView.text }))
-                      : (card && card.card ? h(AssetCardView, { card: card.card, onPick }) : null),
+                      : (card && card.card ? h(AssetCardView, { card: card.card, onPick, pushToast }) : null),
                     data && data.note && !(card && card.card) ? h('div', { className: 'ue-hint' }, data.note) : null,
                     mesh && mesh.animationError ? h('div', { className: 'ue-banner' }, mesh.animationError) : null,
                     json && json.length > 2 && !(card && card.card)
