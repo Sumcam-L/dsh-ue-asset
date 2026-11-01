@@ -211,7 +211,7 @@ public static class AssetAnalyzer
             foreach (var item in ifaces.OfType<JObject>())
                 interfaces.Add(ObjectPathOf(item));
 
-        return new JObject
+        var card = new JObject
         {
             ["type"] = "blueprint",
             // Cooked anim blueprints keep few properties, so fall back to the naming convention.
@@ -224,6 +224,156 @@ public static class AssetAnalyzer
             ["cdoExport"] = inspect.Exports.FirstOrDefault(e => e.Name.StartsWith("Default__", StringComparison.Ordinal))?.Name,
             ["note"] = "cooked packages usually drop the Ubergraph/function node graph; bytecode is not decompiled"
         };
+
+        var graph = AnimGraph(props);
+        if (graph is not null) card["animGraph"] = graph;
+        return card;
+    }
+
+    private const int AnimTreeDepth = 8;
+    private const int AnimTreeBudget = 400;
+    private const int AnimStateLimit = 60;
+
+    /// <summary>
+    /// Rebuilds the AnimGraph pose wiring. Compiling an anim blueprint flattens every
+    /// UAnimGraphNode_* subobject into one node array, and FPoseLink.LinkID is an index into it.
+    /// The tagged properties serialise those subobjects in that same order, so LinkID resolves
+    /// back to a node; this is the one graph cooked data really preserves.
+    /// </summary>
+    private static JObject? AnimGraph(JObject props)
+    {
+        var nodes = props.Properties()
+            .Where(p => p.Name.StartsWith("AnimGraphNode_", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (nodes.Count == 0) return null;
+
+        var inputs = new List<(string Pin, int Target)>[nodes.Count];
+        var totals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var linkCount = 0;
+        var unconnected = 0;
+        var unresolved = 0;
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            inputs[i] = [];
+            CollectLinks(nodes[i].Value, string.Empty, inputs[i]);
+            linkCount += inputs[i].Count;
+            foreach (var (_, target) in inputs[i])
+            {
+                // -1 is a pin left empty in the editor; anything else out of range means the
+                // node array order did not match (a different engine build), so it is reported.
+                if (target == -1) unconnected++;
+                else if (target < 0 || target >= nodes.Count) unresolved++;
+            }
+
+            var kind = NodeKind(nodes[i].Name);
+            totals[kind] = totals.TryGetValue(kind, out var seen) ? seen + 1 : 1;
+        }
+
+        var kinds = new JArray();
+        foreach (var pair in totals.OrderByDescending(p => p.Value).Take(24))
+            kinds.Add(new JObject { ["kind"] = pair.Key, ["count"] = pair.Value });
+
+        var roots = new JArray();
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            if (!NodeKind(nodes[i].Name).Equals("AnimGraphNode_Root", StringComparison.OrdinalIgnoreCase)) continue;
+            var target = inputs[i].Count > 0 ? inputs[i][0].Target : -1;
+            roots.Add(new JObject
+            {
+                ["name"] = nodes[i].Name,
+                ["index"] = i,
+                ["pin"] = inputs[i].Count > 0 ? inputs[i][0].Pin : null,
+                ["target"] = target >= 0 && target < nodes.Count ? nodes[target].Name : null
+            });
+        }
+
+        var tree = new JArray();
+        var visited = new HashSet<int>();
+        var budget = AnimTreeBudget;
+        var ignored = 0;
+        foreach (var root in roots.OfType<JObject>())
+            tree.Add(BuildAnimNode(nodes, inputs, root["index"]!.Value<int>(), 0, visited, ref budget, ref ignored));
+
+        // A state machine's states hang off StateResult nodes, which no pose link points at, so
+        // they are collected separately or the whole state body would be invisible.
+        var states = new JArray();
+        for (var i = 0; i < nodes.Count && states.Count < AnimStateLimit; i++)
+        {
+            if (!NodeKind(nodes[i].Name).Equals("AnimGraphNode_StateResult", StringComparison.OrdinalIgnoreCase)) continue;
+            var state = BuildAnimNode(nodes, inputs, i, 0, new HashSet<int>(), ref budget, ref ignored);
+            state["pin"] = null;
+            states.Add(state);
+        }
+
+        return new JObject
+        {
+            ["nodeCount"] = nodes.Count,
+            ["linkCount"] = linkCount,
+            ["unconnected"] = unconnected,
+            ["unresolved"] = unresolved,
+            ["kinds"] = kinds,
+            ["stateCount"] = totals.TryGetValue("AnimGraphNode_StateResult", out var stateCount) ? stateCount : states.Count,
+            ["roots"] = roots,
+            ["tree"] = tree,
+            ["states"] = states,
+            ["truncated"] = budget <= 0
+        };
+    }
+
+    private static JObject BuildAnimNode(
+        List<JProperty> nodes,
+        List<(string Pin, int Target)>[] inputs,
+        int index,
+        int depth,
+        HashSet<int> visited,
+        ref int budget,
+        ref int unresolved)
+    {
+        var node = new JObject { ["name"] = nodes[index].Name, ["index"] = index, ["kind"] = NodeKind(nodes[index].Name) };
+        if (depth >= AnimTreeDepth || budget <= 0 || !visited.Add(index)) return node;
+
+        budget--;
+        var children = new JArray();
+        foreach (var (pin, target) in inputs[index])
+        {
+            if (target < 0 || target >= nodes.Count)
+            {
+                unresolved++;
+                children.Add(new JObject { ["pin"] = pin, ["target"] = null });
+                continue;
+            }
+
+            var child = BuildAnimNode(nodes, inputs, target, depth + 1, visited, ref budget, ref unresolved);
+            child["pin"] = pin;
+            children.Add(child);
+        }
+
+        node["children"] = children;
+        return node;
+    }
+
+    private static void CollectLinks(JToken token, string pin, List<(string Pin, int Target)> into)
+    {
+        switch (token)
+        {
+            case JObject obj when obj.Count == 1 && obj["LinkID"] is JValue { Type: JTokenType.Integer } value:
+                into.Add((pin, value.Value<int>()));
+                break;
+            case JObject obj:
+                foreach (var property in obj.Properties())
+                    CollectLinks(property.Value, pin.Length == 0 ? property.Name : pin + "." + property.Name, into);
+                break;
+            case JArray array:
+                for (var i = 0; i < array.Count; i++) CollectLinks(array[i], pin + "[" + i + "]", into);
+                break;
+        }
+    }
+
+    /// <summary>"AnimGraphNode_ApplyAdditive_10" → "AnimGraphNode_ApplyAdditive".</summary>
+    private static string NodeKind(string name)
+    {
+        var underscore = name.LastIndexOf('_');
+        return underscore > 0 && int.TryParse(name[(underscore + 1)..], out _) ? name[..underscore] : name;
     }
 
     // CUE4Parse writes the parsed rows to a root-level "Rows" member (UDataTable.WriteJson),

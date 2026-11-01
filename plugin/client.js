@@ -289,6 +289,15 @@ window.__ModuleLoader__.load({
       .ue-table th:last-child, .ue-table td:last-child { padding-right:14px; }
       .ue-chip-list { display:flex; flex-wrap:wrap; gap:4px; }
       .ue-bone-list { display:flex; flex-wrap:wrap; gap:4px; max-height:190px; overflow:auto; }
+      .ue-agraph { display:flex; flex-direction:column; gap:6px; }
+      .ue-atree { border:1px solid var(--dsw-alias-border-l1); border-radius:8px; padding:6px; font-size:11px; line-height:1.5; }
+      .ue-atree-scroll { max-height:340px; overflow:auto; }
+      .ue-atnode { display:contents; }
+      .ue-atrow { display:flex; align-items:baseline; gap:6px; min-width:0; white-space:nowrap; }
+      .ue-atpin { flex:none; font-size:10px; color:var(--dsw-alias-brand-primary); opacity:.9; }
+      .ue-atpin::after { content:'→'; margin-left:3px; opacity:.55; }
+      .ue-atlabel { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+      .ue-atrow-empty .ue-atlabel { color:var(--dsw-alias-label-tertiary); font-style:italic; }
       .ue-refs { display:flex; flex-direction:column; border:1px solid var(--dsw-alias-border-l1); border-radius:8px; overflow:hidden; max-height:300px; }
       .ue-ref { display:flex; align-items:center; gap:8px; padding:4px 8px; font-size:11px; cursor:pointer; min-width:0; }
       .ue-ref:nth-child(odd) { background:var(--dsw-alias-bg-layer-1); }
@@ -1421,6 +1430,24 @@ window.__ModuleLoader__.load({
               }))))))
     }
 
+    // Cooked anim blueprints keep every UAnimGraphNode_* subobject, and the compiler flattens them
+    // into one array that FPoseLink.LinkID indexes; the backend resolves that back to a tree.
+    function AnimGraphTree(props) {
+      const node = props.node || {}
+      const depth = props.depth || 0
+      const children = Array.isArray(node.children) ? node.children : []
+      const label = String(node.name || '').replace(/^AnimGraphNode_/, '')
+      return h('div', { className: 'ue-atnode' },
+        h('div', { className: 'ue-atrow', style: { paddingLeft: depth * 12 + 'px' } },
+          node.pin ? h('span', { className: 'ue-atpin' }, node.pin) : null,
+          h('span', { className: 'ue-atlabel', title: node.name || '' }, label)),
+        children.map((child, index) => (child && Array.isArray(child.children))
+          ? h(AnimGraphTree, { key: index, node: child, depth: depth + 1 })
+          : h('div', { key: index, className: 'ue-atrow ue-atrow-empty', style: { paddingLeft: (depth + 1) * 12 + 'px' } },
+            h('span', { className: 'ue-atpin' }, (child && child.pin) || ''),
+            h('span', { className: 'ue-atlabel' }, '未连接'))))
+    }
+
     function BlueprintCardView(props) {
       const card = props.card || {}
       const functions = (Array.isArray(card.functions) ? card.functions : [])
@@ -1428,17 +1455,43 @@ window.__ModuleLoader__.load({
       const components = (Array.isArray(card.components) ? card.components : []).filter(Boolean)
       const interfaces = (Array.isArray(card.interfaces) ? card.interfaces : []).filter(Boolean)
       const nodes = (Array.isArray(card.animGraphNodes) ? card.animGraphNodes : []).filter(Boolean)
-      const empty = functions.length === 0 && components.length === 0 && interfaces.length === 0 && nodes.length === 0
+      const graph = card.animGraph || null
+      const graphKinds = graph && Array.isArray(graph.kinds) ? graph.kinds : []
+      const graphTree = graph && Array.isArray(graph.tree) ? graph.tree : []
+      const graphStates = graph && Array.isArray(graph.states) ? graph.states : []
+      const empty = functions.length === 0 && components.length === 0 && interfaces.length === 0 && nodes.length === 0 && !graph
 
       return h('div', { className: 'ue-card' },
-        h(ChipRow, { chips: [card.isAnimBlueprint ? '动画蓝图' : '蓝图类', card.uberGraph ? '有 Ubergraph' : null, card.cdoExport ? '含 CDO' : null] }),
+        h(ChipRow, {
+          chips: [
+            card.isAnimBlueprint ? '动画蓝图' : '蓝图类',
+            graph ? graph.nodeCount + ' 节点' : null,
+            graph ? graph.linkCount + ' 连接' : null,
+            card.uberGraph ? '有 Ubergraph' : null,
+            card.cdoExport ? '含 CDO' : null
+          ]
+        }),
+        graph ? h('div', { className: 'ue-agraph' },
+          NamedBlock('AnimGraph', graphTree, (list) => h('div', { className: 'ue-atree' },
+            list.map((node, index) => h(AnimGraphTree, { key: index, node })))),
+          NamedBlock('状态', graphStates, (list) => h('div', null,
+            h('div', { className: 'ue-atree ue-atree-scroll' },
+              list.map((node, index) => h(AnimGraphTree, { key: index, node }))),
+            graph.stateCount > list.length
+              ? h('div', { className: 'ue-hint' }, '共 ' + graph.stateCount + ' 个状态，这里展开前 ' + list.length + ' 个')
+              : null)),
+          graphKinds.length ? h('div', { className: 'ue-chip-list' },
+            graphKinds.map((item) => h('span', { key: item.kind, className: 'ue-chip' },
+              String(item.kind || '').replace(/^AnimGraphNode_/, '') + ' ' + item.count))) : null,
+          graph.truncated ? h('div', { className: 'ue-hint' }, '节点过多，只展开了前一部分。') : null) : null,
         NamedBlock('函数', functions, (list) => h('div', { className: 'ue-chip-list' },
           list.map((name) => h('span', { key: name, className: 'ue-chip' }, name)))),
         NamedBlock('组件', components, (list) => h('div', { className: 'ue-chip-list' },
           list.map((name) => h('span', { key: name, className: 'ue-chip' }, name)))),
         NamedBlock('接口', interfaces, (list) => h('div', { className: 'ue-chip-list' },
           list.map((path) => h('span', { key: path, className: 'ue-chip', title: path }, assetLeafName(path))))),
-        NamedBlock('AnimGraph 节点', nodes, (list) => h('div', { className: 'ue-chip-list' },
+        // The flat list is only useful when the graph could not be rebuilt (older builds, other games).
+        graph ? null : NamedBlock('AnimGraph 节点', nodes, (list) => h('div', { className: 'ue-chip-list' },
           list.map((name) => h('span', { key: name, className: 'ue-chip' }, name)))),
         empty ? h('div', { className: 'ue-hint' }, card.note || '这个蓝图没有序列化出函数或组件。') : null)
     }
