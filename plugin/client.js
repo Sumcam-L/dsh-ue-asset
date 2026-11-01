@@ -35,6 +35,7 @@ window.__ModuleLoader__.load({
         countUnit: '项',
         filterHint: '输入关键词以按类型筛选',
         reload: '重载',
+        forward: '前进',
         retry: '重试',
         closeSession: '关闭会话',
         chooseGame: '选择游戏',
@@ -97,6 +98,7 @@ window.__ModuleLoader__.load({
         countUnit: 'items',
         filterHint: 'Type a query to filter by kind',
         reload: 'Reload',
+        forward: 'Forward',
         retry: 'Retry',
         closeSession: 'Close session',
         chooseGame: 'Choose a game',
@@ -276,6 +278,13 @@ window.__ModuleLoader__.load({
       .ue-seg { border:0; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; }
       .ue-seg.on { background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary); }
       .ue-raw { max-height:none; white-space:pre-wrap; word-break:break-word; font-size:11px; }
+      .ue-jcode { counter-reset:ln; padding:6px 8px 6px 0; color:var(--dsw-alias-label-secondary); }
+      .ue-jline { counter-increment:ln; position:relative; padding-left:34px; white-space:pre-wrap; word-break:break-word; min-height:1.5em; }
+      .ue-jline::before { content:counter(ln); position:absolute; left:0; top:0; width:26px; text-align:right; color:var(--dsw-alias-label-tertiary); opacity:.6; -webkit-user-select:none; user-select:none; }
+      .ue-jkey { color:#9cdcfe; }
+      .ue-jstr { color:#ce9178; }
+      .ue-jnum { color:#b5cea8; }
+      .ue-jbool { color:#569cd6; }
       .ue-skel { display:flex; flex-direction:column; gap:8px; padding:10px; }
       .ue-skel i { display:block; height:10px; border-radius:5px; background:linear-gradient(90deg, var(--dsw-alias-bg-layer-2) 25%, var(--dsw-alias-bg-layer-1) 37%, var(--dsw-alias-bg-layer-2) 63%); background-size:400% 100%; animation:ue-shimmer 1.4s ease infinite; }
       .ue-skel-label { margin-top:2px; font-size:11px; color:var(--dsw-alias-label-secondary); font-variant-numeric:tabular-nums; }
@@ -470,6 +479,52 @@ window.__ModuleLoader__.load({
     function IconClose(props) {
       return h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
         h('path', { d: 'M6 6l12 12' }), h('path', { d: 'M18 6L6 18' }))
+    }
+
+    function IconBack(props) {
+      return h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('path', { d: 'M15 5l-7 7 7 7' }))
+    }
+
+    function IconForward(props) {
+      return h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('path', { d: 'M9 5l7 7-7 7' }))
+    }
+
+    // Highlights the serialized property tree the way an editor does: keys, strings, numbers,
+    // literals. Gutter line numbers come from a CSS counter, so no extra elements are created.
+    const JSON_TOKEN = /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g
+
+    function jsonLine(line) {
+      const out = []
+      let last = 0
+      let match
+      JSON_TOKEN.lastIndex = 0
+      while ((match = JSON_TOKEN.exec(line)) !== null) {
+        if (match.index > last) out.push(line.slice(last, match.index))
+        const key = 't' + match.index
+        if (match[1]) {
+          out.push(h('span', { key, className: match[2] ? 'ue-jkey' : 'ue-jstr' }, match[1]))
+          if (match[2]) out.push(match[2])
+        } else if (match[3]) {
+          out.push(h('span', { key, className: 'ue-jbool' }, match[3]))
+        } else if (match[4]) {
+          out.push(h('span', { key, className: 'ue-jnum' }, match[4]))
+        }
+        last = match.index + match[0].length
+      }
+      if (last < line.length) out.push(line.slice(last))
+      return out
+    }
+
+    function JsonView(props) {
+      const text = props.text || ''
+      if (!text) return null
+      // Thousands of spans on a multi-megabyte dump would stall the panel; plain text is fine there.
+      if (text.length > 400000) return h('pre', { className: 'ue-pre ue-raw' }, text)
+      const lines = text.split(/\r?\n/)
+      return h('pre', { className: 'ue-pre ue-raw ue-jcode' },
+        lines.map((line, index) => h('div', { key: index, className: 'ue-jline' }, jsonLine(line))))
     }
 
     function BrowseTab(props) {
@@ -1131,6 +1186,20 @@ window.__ModuleLoader__.load({
       return String(value === null || value === undefined ? '' : value);
     }
 
+    // Serialized UE enums come through as "EMaterialShadingModel::MSM_SubsurfaceProfile".
+    const USED_WITH_LABELS = {
+      SkeletalMesh: '骨骼网格', StaticMesh: '静态网格', InstancedStaticMeshes: '实例静态网格',
+      MeshParticles: '网格粒子', NiagaraMeshParticles: 'Niagara 粒子', MorphTargets: '变形目标',
+      Clothing: '布料', ParticleSprites: '粒子精灵', GeometryCache: '几何缓存', Landscape: '地形',
+      HairStrands: '毛发', Water: '水面', VirtualHeightfieldMesh: '虚拟高度场', Nanite: 'Nanite'
+    }
+
+    function materialEnumName(value) {
+      const text = String(value === null || value === undefined ? '' : value)
+      const tail = text.split('::').pop() || text
+      return tail.replace(/^(MSM_|BLEND_|M_|SM_)/, '')
+    }
+
     // The preview payload for non-raster assets only carries size/export counts, which is nearly
     // no information. /asset returns the typed card (parents, textures, parameters), so render that.
     function AssetCardView(props) {
@@ -1142,10 +1211,15 @@ window.__ModuleLoader__.load({
       const chips = [];
       if (type === 'material') {
         if (card.instance) chips.push('材质实例');
-        if (card.blendMode) chips.push(String(card.blendMode).replace(/^BLEND_/, ''));
-        if (card.shadingModel) chips.push(String(card.shadingModel).replace(/^MSM_/, ''));
+        if (card.blendMode) chips.push(materialEnumName(card.blendMode));
+        if (card.shadingModel) chips.push(materialEnumName(card.shadingModel));
         if (card.twoSided) chips.push('双面');
         if (card.masked) chips.push('Masked');
+        (Array.isArray(card.usedWith) ? card.usedWith : []).forEach((flag) => {
+          chips.push(USED_WITH_LABELS[flag] || flag)
+        });
+        // Instances carry none of these themselves; label where they came from.
+        if (card.inherited) chips.push('继承自父材质');
       }
       const parents = (Array.isArray(card.parents) ? card.parents : []).filter((item) => item);
       const textureEntries = card.textures && typeof card.textures === 'object'
@@ -1205,12 +1279,17 @@ window.__ModuleLoader__.load({
                     hex ? h('i', { className: 'ue-swatch', style: { background: hex } }) : null,
                     h('span', { className: 'ue-param-v' }, formatParamValue(item)));
                 })))
+          : null,
+        // A cooked base material is stripped down to little more than its usage flags, so say
+        // why the card is thin instead of leaving an empty panel.
+        type === 'material' && !card.instance && parents.length === 0 && textureEntries.length === 0 && params.length === 0
+          ? h('div', { className: 'ue-hint' }, '基础材质：烘焙包不保存材质图与参数，参数值只在继承它的材质实例里存在。')
           : null
       );
     }
 
     function PreviewTab(props) {
-      const { sessionId, path, pushToast, onPick } = props;
+      const { sessionId, path, pushToast, onPick, onBack, onForward, canBack, canForward } = props;
       const [data, setData] = useState(null);
       const [error, setError] = useState(null);
       const [loading, setLoading] = useState(false);
@@ -1352,6 +1431,8 @@ window.__ModuleLoader__.load({
           h('div', { className: 'ue-pp-info' },
             h('div', { className: 'ue-pp-title', title: fullName }, shortName || t('preview')),
             h('div', { className: 'ue-pp-path', title: path || '' }, path || '')),
+          path ? h('button', { className: 'ue-icon-btn', title: t('back'), disabled: !canBack, onClick: onBack }, h(IconBack)) : null,
+          path ? h('button', { className: 'ue-icon-btn', title: t('forward'), disabled: !canForward, onClick: onForward }, h(IconForward)) : null,
           path ? h('button', { className: 'ue-icon-btn', title: t('reload'), disabled: loading, onClick: () => runPreview(animationPath) }, h(IconRefresh)) : null,
           path ? h('button', { className: 'ue-icon-btn', title: t('copyPath'), onClick: copyPath }, h(IconCopy)) : null,
           path ? h('button', { className: 'ue-btn primary', disabled: loading, onClick: exportOne }, t('export')) : null
@@ -1402,7 +1483,9 @@ window.__ModuleLoader__.load({
                       data && data.kind ? h('span', { className: 'ue-chip' }, data.kind) : null,
                       data && data.width ? h('span', { className: 'ue-chip' }, data.width + '×' + data.height) : null),
                     jsonView
-                      ? h('pre', { className: 'ue-pre ue-raw' }, rawView.loading ? '读取完整属性…' : rawView.text)
+                      ? (rawView.loading
+                          ? h('div', { className: 'ue-hint' }, '读取完整属性…')
+                          : h(JsonView, { text: rawView.text }))
                       : (card && card.card ? h(AssetCardView, { card: card.card, onPick }) : null),
                     data && data.note && !(card && card.card) ? h('div', { className: 'ue-hint' }, data.note) : null,
                     mesh && mesh.animationError ? h('div', { className: 'ue-banner' }, mesh.animationError) : null,
@@ -1438,7 +1521,40 @@ window.__ModuleLoader__.load({
       const [icons, setIcons] = useState({})
       const [closing, setClosing] = useState(null)
       const previewPaneRef = useRef(null)
+      // Browsing history for the preview pane: a ref so the stack survives re-renders without
+      // every push allocating a new array; navTick only exists to re-render the two buttons.
+      const navRef = useRef({ items: [], index: -1 })
+      const [navTick, setNavTick] = useState(0)
       const { toast, push } = useToasts()
+
+      const navigate = useCallback((next) => {
+        if (!next) return
+        const state = navRef.current
+        if (state.items[state.index] !== next) {
+          state.items = state.items.slice(0, state.index + 1)
+          state.items.push(next)
+          if (state.items.length > 80) state.items = state.items.slice(-80)
+          state.index = state.items.length - 1
+          setPreviewPath(next)
+          setNavTick((value) => value + 1)
+        }
+        setTab('preview')
+      }, [])
+
+      const goStep = useCallback((delta) => {
+        const state = navRef.current
+        const next = state.index + delta
+        if (next < 0 || next >= state.items.length) return
+        state.index = next
+        setPreviewPath(state.items[next])
+        setTab('preview')
+        setNavTick((value) => value + 1)
+      }, [])
+
+      const resetNav = useCallback(() => {
+        navRef.current = { items: [], index: -1 }
+        setNavTick((value) => value + 1)
+      }, [])
 
       const refresh = useCallback(async () => {
         try {
@@ -1465,12 +1581,11 @@ window.__ModuleLoader__.load({
             if (!item || !item.sessionId || !item.path) return
             await refresh()
             setSessionId(item.sessionId)
-            setPreviewPath(item.path)
-            setTab('preview')
+            navigate(item.path)
           } catch {}
         }, 1500)
         return () => clearInterval(timer)
-      }, [refresh])
+      }, [refresh, navigate])
 
       const profileNames = config && config.profiles ? config.profiles.map((profile) => profile.name).join('|') : ''
       useEffect(() => {
@@ -1512,7 +1627,7 @@ window.__ModuleLoader__.load({
         try {
           await api('/close', { sessionId: id })
           setSessions((prev) => prev.filter((session) => session.sessionId !== id))
-          if (sessionId === id) { setSessionId(null); setPreviewPath(null); setTab('browse') }
+          if (sessionId === id) { setSessionId(null); setPreviewPath(null); resetNav(); setTab('browse') }
           await refresh()
           push(t('sessionClosed'))
         } catch (e) { setError(e.message) }
@@ -1655,9 +1770,19 @@ window.__ModuleLoader__.load({
         : h(React.Fragment, null,
             current && current.needsKey ? h('div', { className: 'ue-banner' }, t('needsKey') + ' (' + current.missing + ')') : null,
             h('div', { className: 'ue-pane', hidden: tab !== 'browse' },
-              h(BrowseTab, { sessionId, pushToast: push, onOpenAsset: (path) => { setPreviewPath(path); setTab('preview') } })),
+              h(BrowseTab, { sessionId, pushToast: push, onOpenAsset: (path) => navigate(path) })),
             h('div', { className: 'ue-pane', ref: previewPaneRef, hidden: tab !== 'preview' },
-              h(PreviewTab, { key: (sessionId || '') + '|' + (previewPath || ''), sessionId, path: previewPath, pushToast: push, onPick: (next) => { setPreviewPath(next); setTab('preview') } }))
+              h(PreviewTab, {
+                key: (sessionId || '') + '|' + (previewPath || ''),
+                sessionId,
+                path: previewPath,
+                pushToast: push,
+                onPick: navigate,
+                onBack: () => goStep(-1),
+                onForward: () => goStep(1),
+                canBack: navTick >= 0 && navRef.current.index > 0,
+                canForward: navTick >= 0 && navRef.current.index >= 0 && navRef.current.index < navRef.current.items.length - 1
+              }))
           )
 
       return h('div', { className: 'ue-root' },

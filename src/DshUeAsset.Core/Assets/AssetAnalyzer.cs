@@ -73,6 +73,10 @@ public static class AssetAnalyzer
 
         Collect(props, scalars, vectors, textures);
 
+        // A material instance only serializes its parent and overrides; blend mode, shading model
+        // and usage flags live on the base material, so inherit them from the first parent.
+        var info = props;
+
         // Walk the parent chain; child values win and missing ones are filled from parents.
         var current = parent;
         for (var depth = 0; depth < 4 && !string.IsNullOrWhiteSpace(current); depth++)
@@ -85,6 +89,8 @@ public static class AssetAnalyzer
                 var parentRoot = Parse(parentInspect.PropertiesJson);
                 var parentProps = parentRoot["Properties"] as JObject ?? new JObject();
                 Collect(parentProps, scalars, vectors, textures, overwrite: false);
+                // Keep walking until a layer actually carries the flags (instances usually do not).
+                if (info["ShadingModel"] is null && parentProps["ShadingModel"] is not null) info = parentProps;
                 var grand = ObjectPathOf(parentProps["Parent"]);
                 if (!string.IsNullOrWhiteSpace(grand))
                 {
@@ -103,6 +109,14 @@ public static class AssetAnalyzer
         if (props["BasePropertyOverrides"] is JObject bo)
             foreach (var p in bo.Properties()) overrides[p.Name] = p.Value.DeepClone();
 
+        // Cooked base materials keep almost nothing: no graph, no parameters, no blend mode.
+        // The bUsedWith* flags and the shading model are what survives, so surface them.
+        var usedWith = new JArray();
+        foreach (var property in info.Properties())
+            if (property.Name.StartsWith("bUsedWith", StringComparison.OrdinalIgnoreCase) &&
+                property.Value.ToObject<bool?>() == true)
+                usedWith.Add(property.Name.Substring("bUsedWith".Length));
+
         var card = new JObject
         {
             ["type"] = "material",
@@ -113,10 +127,14 @@ public static class AssetAnalyzer
             ["vectors"] = vectors,
             ["textures"] = textures,
             ["overrides"] = overrides,
-            ["blendMode"] = props["BlendMode"]?.ToString(),
-            ["shadingModel"] = props["ShadingModel"]?.ToString(),
-            ["twoSided"] = props["TwoSided"]?.ToObject<bool?>(),
-            ["masked"] = props["bIsMasked"]?.ToObject<bool?>()
+            ["blendMode"] = info["BlendMode"]?.ToString(),
+            ["shadingModel"] = info["ShadingModel"]?.ToString(),
+            ["twoSided"] = info["TwoSided"]?.ToObject<bool?>(),
+            ["masked"] = info["bIsMasked"]?.ToObject<bool?>(),
+            ["usedWith"] = usedWith,
+            ["materialAttributes"] = info["MaterialAttributes"]?["ExpressionName"]?.ToString(),
+            // True when blend/shading/usage came from a parent instead of the asset itself.
+            ["inherited"] = !ReferenceEquals(info, props)
         };
         return card;
     }
