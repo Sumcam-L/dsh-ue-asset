@@ -259,7 +259,7 @@ window.__ModuleLoader__.load({
       .ue-card-label { font-size:10px; color:var(--dsw-alias-label-secondary); letter-spacing:.04em; }
       .ue-parent { display:flex; gap:6px; align-items:center; font-size:11px; padding:3px 8px; border-radius:6px; background:var(--dsw-alias-bg-layer-1); cursor:pointer; min-width:0; }
       .ue-parent:hover { background:var(--dsw-alias-bg-layer-2); }
-      .ue-parent-step { color:var(--dsw-alias-label-tertiary); flex:none; font-size:10px; }
+      .ue-parent-step { flex:none; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:4px; background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-tertiary); font-size:10px; font-variant-numeric:tabular-nums; }
       .ue-parent > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .ue-tex-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:6px; }
       .ue-tex { display:flex; flex-direction:column; gap:2px; padding:6px 8px; border-radius:6px; background:var(--dsw-alias-bg-layer-1); border:1px solid transparent; cursor:pointer; min-width:0; }
@@ -1247,13 +1247,14 @@ window.__ModuleLoader__.load({
         parents.length > 0
           ? h('div', { className: 'ue-card-block' },
               h('div', { className: 'ue-card-label' }, '父材质链'),
-              parents.map((parent, index) => h('div', {
+              // Root first: index 0 is the chain's origin, counting down towards this asset.
+              parents.slice().reverse().map((parent, index) => h('div', {
                 key: parent,
                 className: 'ue-parent',
                 title: parent,
                 onClick: () => { if (onPick) onPick(assetPreviewPath(parent)) }
               },
-                h('span', { className: 'ue-parent-step' }, index === 0 ? '↳' : '↳' + index),
+                h('span', { className: 'ue-parent-step' }, String(index)),
                 h('span', null, assetLeafName(parent)))))
           : null,
         textureEntries.length > 0
