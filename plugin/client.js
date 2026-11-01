@@ -1308,7 +1308,11 @@ window.__ModuleLoader__.load({
         : (image
             ? h('div', { className: 'ue-canvas' }, image)
             : (data && data.kind === 'properties'
-                ? h('div', { className: 'ue-typebar' }, h('span', { className: 'ue-meta' }, (data && data.className) || ''))
+                ? h('div', { className: 'ue-typebar' },
+                    h('span', null, (data && data.className) || ''),
+                    card && card.common && card.common.size
+                      ? h('span', { className: 'ue-meta' }, fmtSize(card.common.size) + ' · ' + (card.common.exportCount || 0) + ' export · ' + (card.common.importCount || 0) + ' import')
+                      : null)
                 : h('div', { className: 'ue-canvas' }, h('span', { className: 'ue-meta' }, data ? data.className || '' : ''))));
 
       return h('div', { className: 'ue-pp' },
@@ -1369,7 +1373,7 @@ window.__ModuleLoader__.load({
                     card && card.card ? h(AssetCardView, { card: card.card, onPick }) : null,
                     data && data.note && !(card && card.card) ? h('div', { className: 'ue-hint' }, data.note) : null,
                     mesh && mesh.animationError ? h('div', { className: 'ue-banner' }, mesh.animationError) : null,
-                    json && json.length > 2
+                    json && json.length > 2 && !(card && card.card)
                       ? h('details', { className: 'ue-props' },
                           h('summary', null,
                             h('span', null, '属性 JSON'),
