@@ -198,7 +198,7 @@ window.__ModuleLoader__.load({
       .ue-btn.primary { background:var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary)); color:var(--dsw-alias-label-primary-foreground, #fff); border-color:transparent; }
       .ue-btn.primary:hover { filter:brightness(1.08); }
       .ue-btn.danger { color:var(--dsw-alias-state-error-primary); }
-      .ue-scroll { flex:1; overflow:auto; min-height:0; padding:2px 0 6px; }
+      .ue-scroll { flex:1; overflow-y:auto; overflow-x:hidden; min-height:0; padding:2px 0 6px; }
       .ue-progress { position:relative; height:2px; flex:none; overflow:hidden; }
       .ue-progress > i { position:absolute; top:0; bottom:0; width:35%; border-radius:2px; background:var(--dsw-alias-brand-primary); animation:ue-slide 1.1s ease-in-out infinite; }
       @keyframes ue-slide { from { left:-35%; } to { left:100%; } }
@@ -224,7 +224,7 @@ window.__ModuleLoader__.load({
       .ue-empty { display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; height:100%; min-height:160px; padding:20px; text-align:center; color:var(--dsw-alias-label-secondary); }
       .ue-empty svg { opacity:.45; }
       .ue-banner { padding:6px 8px; font-size:11px; color:var(--dsw-alias-state-warn-primary); border-bottom:1px solid var(--dsw-alias-border-l1); }
-      .ue-preview { display:flex; flex-direction:column; gap:8px; padding:8px 8px 28px; flex:0 0 auto; }
+      .ue-preview { display:flex; flex-direction:column; gap:8px; padding:8px 8px 28px; flex:0 0 auto; box-sizing:border-box; width:100%; }
       .ue-canvas { border-radius:8px; background-color:var(--dsw-alias-bg-layer-2); background-image:linear-gradient(45deg, rgba(128,128,128,.12) 25%, transparent 25%, transparent 75%, rgba(128,128,128,.12) 75%), linear-gradient(45deg, rgba(128,128,128,.12) 25%, transparent 25%, transparent 75%, rgba(128,128,128,.12) 75%); background-size:16px 16px; background-position:0 0,8px 8px; display:flex; align-items:center; justify-content:center; min-height:120px; }
       .ue-canvas img { max-width:100%; max-height:320px; image-rendering:auto; }
       .ue-meta { color:var(--dsw-alias-label-secondary); font-size:11px; word-break:break-all; }
@@ -308,7 +308,7 @@ window.__ModuleLoader__.load({
       .ue-game > summary:before { content:'▸'; color:var(--dsw-alias-label-secondary); }
       .ue-game[open] > summary:before { content:'▾'; }
       .ue-game-body { padding:0 10px 10px; }
-      .ue-scroll { max-height:180px; overflow:auto; border:1px solid var(--dsw-alias-border-l1); border-radius:8px; padding:6px; }
+      .ue-box-scroll { max-height:180px; overflow:auto; border:1px solid var(--dsw-alias-border-l1); border-radius:8px; padding:6px; }
       .ue-fold { border:1px solid var(--dsw-alias-border-l1); border-radius:8px; margin-bottom:8px; }
       .ue-fold > summary { cursor:pointer; padding:7px 10px; font-size:12px; color:var(--dsw-alias-label-secondary); list-style:none; display:flex; align-items:center; gap:6px; }
       .ue-fold > summary::-webkit-details-marker { display:none; }
@@ -1701,7 +1701,7 @@ window.__ModuleLoader__.load({
 
       const renderPrefixRules = () => h('div', null,
         (draft.prefixRules || []).length > 0
-          ? h('div', { className: 'ue-scroll', style: { maxHeight: 160, marginBottom: 6 } },
+          ? h('div', { className: 'ue-box-scroll', style: { maxHeight: 160, marginBottom: 6 } },
               (draft.prefixRules || []).map((rule, index) => h('div', { key: index, className: 'ue-anim', style: { display: 'flex', gap: 4, marginBottom: 4 } },
                 h('input', { value: rule.prefix, placeholder: '前缀，如 SKM_', onChange: (event) => { const list = [...(draft.prefixRules || [])]; list[index] = { ...rule, prefix: event.target.value }; setDraft({ ...draft, prefixRules: list }) } }),
                 h('input', { value: rule.kind, placeholder: 'kind，如 data_asset', onChange: (event) => { const list = [...(draft.prefixRules || [])]; list[index] = { ...rule, kind: event.target.value }; setDraft({ ...draft, prefixRules: list }) } }),
@@ -1722,7 +1722,7 @@ window.__ModuleLoader__.load({
               : t('loading'))
         }
         return h('div', null,
-          h('div', { className: 'ue-scroll', style: { maxHeight: 200, marginBottom: 6 } },
+          h('div', { className: 'ue-box-scroll', style: { maxHeight: 200, marginBottom: 6 } },
             need.map((state) => h('div', { key: state.pak, style: { marginBottom: 6 } },
               h('div', { className: 'ue-meta', style: { display: 'flex', gap: 6, alignItems: 'center', marginBottom: 2 } },
                 h('span', { style: { flex: 1, minWidth: 0, overflowWrap: 'anywhere' } }, state.pak),
@@ -1803,7 +1803,7 @@ window.__ModuleLoader__.load({
           renderFold('PAK 标签（逗号分隔）', pakTagsCatalog ? pakTagsCatalog.available.length : 0,
             pakTagsCatalog
               ? h('div', null,
-                  h('div', { className: 'ue-scroll' },
+                  h('div', { className: 'ue-box-scroll' },
                     pakTagsCatalog.available.map((pak) => h('div', { key: pak.name, style: { marginBottom: 4 } },
                       h('div', { className: 'ue-meta', style: { marginBottom: 2 } }, pak.name),
                       h('input', { value: tagDrafts[pak.name] || '', placeholder: '如 base,ui,chapter1', onChange: (event) => setTagDrafts({ ...tagDrafts, [pak.name]: event.target.value }) })
