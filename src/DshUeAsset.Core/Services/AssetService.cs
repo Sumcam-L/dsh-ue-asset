@@ -528,11 +528,13 @@ public sealed class AssetService : IDisposable
         return AssetIndex.Drop(AssetIndex.DbPath(IndexRoot, profile));
     }
 
-    public Task<InspectResult> InspectAsync(string sessionId, string objectPath, string section, int exportLimit, CancellationToken ct = default)
+    public Task<InspectResult> InspectAsync(string sessionId, string objectPath, string section, int exportLimit, int? maxChars = null, CancellationToken ct = default)
     {
         var session = Sessions.Get(sessionId);
-        var maxChars = Config.Limits.MaxResponseChars;
-        return WithGateAsync(session, () => ObjectReader.Inspect(session.Provider, objectPath, section, maxChars, exportLimit), ct);
+        // Callers that need the complete tree (the JSON pane) pass 0 for "no limit"; the default
+        // still honours the configured response cap so AI tool output stays bounded.
+        var limit = maxChars is null || maxChars < 0 ? Config.Limits.MaxResponseChars : maxChars.Value;
+        return WithGateAsync(session, () => ObjectReader.Inspect(session.Provider, objectPath, section, limit, exportLimit), ct);
     }
 
     public async Task<PreviewResult> PreviewAsync(string sessionId, string objectPath, int maxSize, string? animationPath = null, CancellationToken ct = default)

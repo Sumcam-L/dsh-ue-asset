@@ -66,7 +66,7 @@ public static class ObjectReader
                 try
                 {
                     json = JsonConvert.SerializeObject(main, Settings);
-                    if (json.Length > maxChars)
+                    if (maxChars > 0 && json.Length > maxChars)
                     {
                         json = json[..maxChars] + "\n… (truncated)";
                         truncated = true;

@@ -11,7 +11,8 @@ public static class AssetAnalyzer
 {
     public static JObject Analyze(IFileProvider provider, string objectPath, bool includeRaw, int maxChars)
     {
-        var inspect = ObjectReader.Inspect(provider, objectPath, "all", Math.Max(maxChars, 100_000), 200);
+        // 0 disables truncation: the complete tree is required, and a cut-off dump parses to {}.
+        var inspect = ObjectReader.Inspect(provider, objectPath, "all", 0, 200);
         var root = Parse(inspect.PropertiesJson);
         var props = root["Properties"] as JObject ?? new JObject();
         var className = inspect.Meta.ClassName ?? "";

@@ -285,6 +285,7 @@ window.__ModuleLoader__.load({
       .ue-jstr { color:#ce9178; }
       .ue-jnum { color:#b5cea8; }
       .ue-jbool { color:#569cd6; }
+      .ue-jrest { white-space:pre-wrap; word-break:break-word; padding-left:34px; }
       .ue-skel { display:flex; flex-direction:column; gap:8px; padding:10px; }
       .ue-skel i { display:block; height:10px; border-radius:5px; background:linear-gradient(90deg, var(--dsw-alias-bg-layer-2) 25%, var(--dsw-alias-bg-layer-1) 37%, var(--dsw-alias-bg-layer-2) 63%); background-size:400% 100%; animation:ue-shimmer 1.4s ease infinite; }
       .ue-skel-label { margin-top:2px; font-size:11px; color:var(--dsw-alias-label-secondary); font-variant-numeric:tabular-nums; }
@@ -517,14 +518,21 @@ window.__ModuleLoader__.load({
       return out
     }
 
+    // One highlighted line costs ~6 spans, so a 300 KB property dump would be tens of thousands of
+    // nodes. Highlight the head and keep the tail as one plain block: it still reads fine and the
+    // panel stays responsive.
+    const JSON_HIGHLIGHT_LINES = 1500
+
     function JsonView(props) {
       const text = props.text || ''
       if (!text) return null
-      // Thousands of spans on a multi-megabyte dump would stall the panel; plain text is fine there.
-      if (text.length > 400000) return h('pre', { className: 'ue-pre ue-raw' }, text)
+      if (text.length > 2000000) return h('pre', { className: 'ue-pre ue-raw' }, text)
       const lines = text.split(/\r?\n/)
+      const head = lines.slice(0, JSON_HIGHLIGHT_LINES)
+      const rest = lines.slice(JSON_HIGHLIGHT_LINES).join('\n')
       return h('pre', { className: 'ue-pre ue-raw ue-jcode' },
-        lines.map((line, index) => h('div', { key: index, className: 'ue-jline' }, jsonLine(line))))
+        head.map((line, index) => h('div', { key: index, className: 'ue-jline' }, jsonLine(line))),
+        rest ? h('div', { className: 'ue-jrest' }, rest) : null)
     }
 
     function BrowseTab(props) {
@@ -1380,7 +1388,8 @@ window.__ModuleLoader__.load({
         if (cached) { setRawView({ loading: false, text: cached }); return undefined; }
         let cancelled = false;
         setRawView({ loading: true, text: '' });
-        api('/inspect', { sessionId, path, section: 'properties' })
+        // maxChars 0 = no truncation; the whole tree is what the JSON pane is for.
+        api('/inspect', { sessionId, path, section: 'properties', maxChars: 0 })
           .then((result) => {
             const text = (result && result.propertiesJson) || '';
             rawCache.current[path] = text;

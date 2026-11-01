@@ -229,7 +229,8 @@ public sealed class JsonLineServer
                     Required(p, "sessionId"),
                     Required(p, "path"),
                     Optional(p, "section") ?? "all",
-                    Int(p, "exportLimit", 100)).ConfigureAwait(false);
+                    Int(p, "exportLimit", 100),
+                    Int(p, "maxChars", -1)).ConfigureAwait(false);
 
             case "mesh":
                 return await _service.MeshAsync(
