@@ -250,6 +250,28 @@ window.__ModuleLoader__.load({
       .ue-pp-title { font-size:11px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .ue-pp-path { font-size:10px; color:var(--dsw-alias-label-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .ue-pp-meta { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+      /* Definition card: a material/preview payload carries the useful shape, the bare meta JSON does not. */
+      .ue-card { display:flex; flex-direction:column; gap:10px; }
+      .ue-card-block { display:flex; flex-direction:column; gap:4px; }
+      .ue-card-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+      .ue-card-label { font-size:10px; color:var(--dsw-alias-label-secondary); letter-spacing:.04em; }
+      .ue-parent { display:flex; gap:6px; align-items:center; font-size:11px; padding:3px 8px; border-radius:6px; background:var(--dsw-alias-bg-layer-1); cursor:pointer; min-width:0; }
+      .ue-parent:hover { background:var(--dsw-alias-bg-layer-2); }
+      .ue-parent-step { color:var(--dsw-alias-label-tertiary); flex:none; font-size:10px; }
+      .ue-parent > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-tex-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:6px; }
+      .ue-tex { display:flex; flex-direction:column; gap:2px; padding:6px 8px; border-radius:6px; background:var(--dsw-alias-bg-layer-1); border:1px solid transparent; cursor:pointer; min-width:0; }
+      .ue-tex:hover { border-color:var(--dsw-alias-border-l2); }
+      .ue-tex-file { font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-tex-name { font-size:10px; color:var(--dsw-alias-label-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ue-param-filter { flex:1; min-width:0; padding:3px 7px; border-radius:6px; border:1px solid var(--dsw-alias-border-l1); background:transparent; color:inherit; font-size:11px; }
+      .ue-params { display:flex; flex-direction:column; }
+      .ue-param { display:flex; gap:8px; align-items:center; font-size:11px; padding:2px 6px; border-radius:4px; }
+      .ue-param:nth-child(odd) { background:var(--dsw-alias-bg-layer-1); }
+      .ue-param-k { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dsw-alias-label-secondary); }
+      .ue-param-v { flex:none; font-family:var(--dsw-font-mono,ui-monospace,monospace); font-variant-numeric:tabular-nums; }
+      .ue-swatch { width:10px; height:10px; border-radius:3px; border:1px solid rgba(128,128,128,.4); flex:none; }
+      .ue-typebar { display:flex; align-items:center; gap:6px; padding:2px 2px 0; font-size:11px; color:var(--dsw-alias-label-secondary); }
       .ue-skel { display:flex; flex-direction:column; gap:8px; padding:10px; }
       .ue-skel i { display:block; height:10px; border-radius:5px; background:linear-gradient(90deg, var(--dsw-alias-bg-layer-2) 25%, var(--dsw-alias-bg-layer-1) 37%, var(--dsw-alias-bg-layer-2) 63%); background-size:400% 100%; animation:ue-shimmer 1.4s ease infinite; }
       .ue-skel-label { margin-top:2px; font-size:11px; color:var(--dsw-alias-label-secondary); font-variant-numeric:tabular-nums; }
@@ -1079,8 +1101,112 @@ window.__ModuleLoader__.load({
         ))
     }
 
+    // Object paths from the card end with ".<index>"; the provider wants the .uasset path.
+    function assetPreviewPath(raw) {
+      const text = String(raw || '').replace(/\.\d+$/, '');
+      if (!text) return '';
+      return /\.uasset$/i.test(text) ? text : text + '.uasset';
+    }
+
+    function assetLeafName(raw) {
+      const text = String(raw || '').replace(/\.\d+$/, '');
+      const cut = text.lastIndexOf('/');
+      return (cut >= 0 ? text.slice(cut + 1) : text) || text;
+    }
+
+    function formatParamValue(item) {
+      const value = item.value;
+      if (item.kind === 'v' && value && typeof value === 'object') {
+        const parts = [value.R, value.G, value.B].map((n) => Math.round((Number(n) || 0) * 1000) / 1000);
+        return parts.join(', ') + (value.A !== undefined ? ', ' + (Math.round((Number(value.A) || 0) * 1000) / 1000) : '');
+      }
+      if (typeof value === 'number') return String(Math.round(value * 1000) / 1000);
+      if (value === true) return 'true';
+      if (value === false) return 'false';
+      if (value && typeof value === 'object') return JSON.stringify(value).slice(0, 48);
+      return String(value === null || value === undefined ? '' : value);
+    }
+
+    // The preview payload for non-raster assets only carries size/export counts, which is nearly
+    // no information. /asset returns the typed card (parents, textures, parameters), so render that.
+    function AssetCardView(props) {
+      const card = props.card;
+      const onPick = props.onPick;
+      const [filter, setFilter] = useState('');
+      if (!card || typeof card !== 'object') return null;
+      const type = card.type || 'generic';
+      const chips = [];
+      if (type === 'material') {
+        if (card.instance) chips.push('材质实例');
+        if (card.blendMode) chips.push(String(card.blendMode).replace(/^BLEND_/, ''));
+        if (card.shadingModel) chips.push(String(card.shadingModel).replace(/^MSM_/, ''));
+        if (card.twoSided) chips.push('双面');
+        if (card.masked) chips.push('Masked');
+      }
+      const parents = (Array.isArray(card.parents) ? card.parents : []).filter((item) => item);
+      const textureEntries = card.textures && typeof card.textures === 'object'
+        ? Object.keys(card.textures).map((key) => ({ name: key, path: String(card.textures[key] || '') }))
+        : [];
+      const scalars = card.scalars && typeof card.scalars === 'object' ? card.scalars : {};
+      const vectors = card.vectors && typeof card.vectors === 'object' ? card.vectors : {};
+      const params = Object.keys(scalars).map((key) => ({ key, kind: 's', value: scalars[key] }))
+        .concat(Object.keys(vectors).map((key) => ({ key, kind: 'v', value: vectors[key] })));
+      const term = filter.trim().toLowerCase();
+      const shown = term ? params.filter((item) => item.key.toLowerCase().indexOf(term) >= 0) : params;
+
+      return h('div', { className: 'ue-card' },
+        chips.length > 0
+          ? h('div', { className: 'ue-card-row' }, chips.map((chip, index) => h('span', { key: index, className: 'ue-chip' }, chip)))
+          : null,
+        parents.length > 0
+          ? h('div', { className: 'ue-card-block' },
+              h('div', { className: 'ue-card-label' }, '父材质链'),
+              parents.map((parent, index) => h('div', {
+                key: parent,
+                className: 'ue-parent',
+                title: parent,
+                onClick: () => { if (onPick) onPick(assetPreviewPath(parent)) }
+              },
+                h('span', { className: 'ue-parent-step' }, index === 0 ? '↳' : '↳' + index),
+                h('span', null, assetLeafName(parent)))))
+          : null,
+        textureEntries.length > 0
+          ? h('div', { className: 'ue-card-block' },
+              h('div', { className: 'ue-card-label' }, '贴图 ' + textureEntries.length),
+              h('div', { className: 'ue-tex-grid' },
+                textureEntries.map((item) => h('div', {
+                  key: item.name,
+                  className: 'ue-tex',
+                  title: item.name + '\n' + item.path,
+                  onClick: () => { if (onPick) onPick(assetPreviewPath(item.path)) }
+                },
+                  h('div', { className: 'ue-tex-file' }, item.name),
+                  h('div', { className: 'ue-tex-name' }, assetLeafName(item.path))))))
+          : null,
+        params.length > 0
+          ? h('div', { className: 'ue-card-block' },
+              h('div', { className: 'ue-card-row' },
+                h('div', { className: 'ue-card-label' }, '参数 ' + params.length),
+                h('input', {
+                  className: 'ue-param-filter',
+                  value: filter,
+                  placeholder: '过滤参数',
+                  onChange: (event) => setFilter(event.target.value)
+                })),
+              h('div', { className: 'ue-params' },
+                shown.map((item) => {
+                  const hex = item.kind === 'v' && item.value && item.value.Hex ? '#' + String(item.value.Hex) : '';
+                  return h('div', { key: item.kind + item.key, className: 'ue-param' },
+                    h('span', { className: 'ue-param-k' }, item.key),
+                    hex ? h('i', { className: 'ue-swatch', style: { background: hex } }) : null,
+                    h('span', { className: 'ue-param-v' }, formatParamValue(item)));
+                })))
+          : null
+      );
+    }
+
     function PreviewTab(props) {
-      const { sessionId, path, pushToast } = props;
+      const { sessionId, path, pushToast, onPick } = props;
       const [data, setData] = useState(null);
       const [error, setError] = useState(null);
       const [loading, setLoading] = useState(false);
@@ -1090,6 +1216,7 @@ window.__ModuleLoader__.load({
       const [animationOptions, setAnimationOptions] = useState([]);
       const [pickerOpen, setPickerOpen] = useState(false);
       const [elapsed, setElapsed] = useState(0);
+      const [card, setCard] = useState(null);
 
       const resolveAnimation = async (raw) => {
         const value = String(raw || '').trim();
@@ -1147,6 +1274,17 @@ window.__ModuleLoader__.load({
         return () => { cancelled = true; };
       }, [sessionId, path, data && data.kind]);
 
+      // Non-raster assets preview as properties; fetch the typed card so the pane shows the
+      // parent chain, texture slots and parameters instead of four counters.
+      useEffect(() => {
+        if (!path || !data || data.kind !== 'properties') { setCard(null); return undefined; }
+        let cancelled = false;
+        api('/asset', { sessionId, path })
+          .then((result) => { if (!cancelled) setCard(result || null); })
+          .catch(() => { if (!cancelled) setCard(null); });
+        return () => { cancelled = true; };
+      }, [sessionId, path, data && data.kind]);
+
       const exportOne = async () => {
         try {
           const job = await api('/export', { sessionId, paths: [path] });
@@ -1167,7 +1305,11 @@ window.__ModuleLoader__.load({
             h(MeshViewer, { key: mesh.modelUrl + (mesh.animation?.url || ''), url: mesh.modelUrl, animationUrl: mesh.animation && mesh.animation.url, materials: mesh.materialBindings || [], materialsOmitted: mesh.materials === false }),
             h('div', { className: 'ue-meta' }, 'GLB ' + fmtSize(mesh.bytes) + (mesh.animation && mesh.animation.clip ? ' · 动画 ' + mesh.animation.clip.name : (mesh.animations ? ' · 含动画' : ' · 静态')) + (mesh.materials === false ? ' · 材质未导出' : (Array.isArray(mesh.materialBindings) && mesh.materialBindings.length > 0 ? ' · 贴图 ' + mesh.materialBindings.length : '')))
           )
-        : h('div', { className: 'ue-canvas' }, image || h('span', { className: 'ue-meta' }, data ? data.className || '' : ''));
+        : (image
+            ? h('div', { className: 'ue-canvas' }, image)
+            : (data && data.kind === 'properties'
+                ? h('div', { className: 'ue-typebar' }, h('span', { className: 'ue-meta' }, (data && data.className) || ''))
+                : h('div', { className: 'ue-canvas' }, h('span', { className: 'ue-meta' }, data ? data.className || '' : ''))));
 
       return h('div', { className: 'ue-pp' },
         h('div', { className: 'ue-pp-head' },
@@ -1224,7 +1366,8 @@ window.__ModuleLoader__.load({
                       h('span', { className: 'ue-chip' }, '[' + ((data && data.className) || '?') + ']'),
                       data && data.kind ? h('span', { className: 'ue-chip' }, data.kind) : null,
                       data && data.width ? h('span', { className: 'ue-chip' }, data.width + '×' + data.height) : null),
-                    data && data.note ? h('div', { className: 'ue-hint' }, data.note) : null,
+                    card && card.card ? h(AssetCardView, { card: card.card, onPick }) : null,
+                    data && data.note && !(card && card.card) ? h('div', { className: 'ue-hint' }, data.note) : null,
                     mesh && mesh.animationError ? h('div', { className: 'ue-banner' }, mesh.animationError) : null,
                     json && json.length > 2
                       ? h('details', { className: 'ue-props' },
@@ -1477,7 +1620,7 @@ window.__ModuleLoader__.load({
             h('div', { className: 'ue-pane', hidden: tab !== 'browse' },
               h(BrowseTab, { sessionId, pushToast: push, onOpenAsset: (path) => { setPreviewPath(path); setTab('preview') } })),
             h('div', { className: 'ue-pane', ref: previewPaneRef, hidden: tab !== 'preview' },
-              h(PreviewTab, { key: (sessionId || '') + '|' + (previewPath || ''), sessionId, path: previewPath, pushToast: push }))
+              h(PreviewTab, { key: (sessionId || '') + '|' + (previewPath || ''), sessionId, path: previewPath, pushToast: push, onPick: (next) => { setPreviewPath(next); setTab('preview') } }))
           )
 
       return h('div', { className: 'ue-root' },
