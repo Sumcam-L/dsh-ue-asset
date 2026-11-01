@@ -272,6 +272,10 @@ window.__ModuleLoader__.load({
       .ue-param-v { flex:none; font-family:var(--dsw-font-mono,ui-monospace,monospace); font-variant-numeric:tabular-nums; }
       .ue-swatch { width:10px; height:10px; border-radius:3px; border:1px solid rgba(128,128,128,.4); flex:none; }
       .ue-typebar { display:flex; align-items:center; gap:6px; padding:2px 2px 0; font-size:11px; color:var(--dsw-alias-label-secondary); }
+      .ue-viewswitch { margin-left:auto; display:flex; gap:2px; background:var(--dsw-alias-bg-layer-1); border-radius:6px; padding:2px; flex:none; }
+      .ue-seg { border:0; background:transparent; color:var(--dsw-alias-label-secondary); font:inherit; font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; }
+      .ue-seg.on { background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary); }
+      .ue-raw { max-height:none; white-space:pre-wrap; word-break:break-word; font-size:11px; }
       .ue-skel { display:flex; flex-direction:column; gap:8px; padding:10px; }
       .ue-skel i { display:block; height:10px; border-radius:5px; background:linear-gradient(90deg, var(--dsw-alias-bg-layer-2) 25%, var(--dsw-alias-bg-layer-1) 37%, var(--dsw-alias-bg-layer-2) 63%); background-size:400% 100%; animation:ue-shimmer 1.4s ease infinite; }
       .ue-skel-label { margin-top:2px; font-size:11px; color:var(--dsw-alias-label-secondary); font-variant-numeric:tabular-nums; }
@@ -1217,6 +1221,9 @@ window.__ModuleLoader__.load({
       const [pickerOpen, setPickerOpen] = useState(false);
       const [elapsed, setElapsed] = useState(0);
       const [card, setCard] = useState(null);
+      const [jsonView, setJsonView] = useState(false);
+      const [rawView, setRawView] = useState({ loading: false, text: '' });
+      const rawCache = useRef({});
 
       const resolveAnimation = async (raw) => {
         const value = String(raw || '').trim();
@@ -1258,6 +1265,7 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         setData(null); setError(null); setLoading(false); setAnimationPath('');
         setAnimationChoices([]); setAnimationOptions([]); setAnimationHint(null); setPickerOpen(false);
+        setJsonView(false); setRawView({ loading: false, text: '' });
         if (path) runPreview('');
       }, [runPreview, path]);
 
@@ -1284,6 +1292,24 @@ window.__ModuleLoader__.load({
           .catch(() => { if (!cancelled) setCard(null); });
         return () => { cancelled = true; };
       }, [sessionId, path, data && data.kind]);
+
+      // The card summarizes; the JSON view is the full serialized property tree, fetched only
+      // when the user actually asks for it (it can be hundreds of KB).
+      useEffect(() => {
+        if (!jsonView || !path) return undefined;
+        const cached = rawCache.current[path];
+        if (cached) { setRawView({ loading: false, text: cached }); return undefined; }
+        let cancelled = false;
+        setRawView({ loading: true, text: '' });
+        api('/inspect', { sessionId, path, section: 'properties' })
+          .then((result) => {
+            const text = (result && result.propertiesJson) || '';
+            rawCache.current[path] = text;
+            if (!cancelled) setRawView({ loading: false, text });
+          })
+          .catch((e) => { if (!cancelled) setRawView({ loading: false, text: '读取失败：' + ((e && e.message) || e) }) });
+        return () => { cancelled = true; };
+      }, [jsonView, sessionId, path]);
 
       const exportOne = async () => {
         try {
@@ -1312,6 +1338,11 @@ window.__ModuleLoader__.load({
                     h('span', null, (data && data.className) || ''),
                     card && card.common && card.common.size
                       ? h('span', { className: 'ue-meta' }, fmtSize(card.common.size) + ' · ' + (card.common.exportCount || 0) + ' export · ' + (card.common.importCount || 0) + ' import')
+                      : null,
+                    card && card.card
+                      ? h('div', { className: 'ue-viewswitch' },
+                          h('button', { className: 'ue-seg' + (jsonView ? '' : ' on'), onClick: () => setJsonView(false) }, '卡片'),
+                          h('button', { className: 'ue-seg' + (jsonView ? ' on' : ''), onClick: () => setJsonView(true) }, 'JSON'))
                       : null)
                 : h('div', { className: 'ue-canvas' }, h('span', { className: 'ue-meta' }, data ? data.className || '' : ''))));
 
@@ -1370,7 +1401,9 @@ window.__ModuleLoader__.load({
                       h('span', { className: 'ue-chip' }, '[' + ((data && data.className) || '?') + ']'),
                       data && data.kind ? h('span', { className: 'ue-chip' }, data.kind) : null,
                       data && data.width ? h('span', { className: 'ue-chip' }, data.width + '×' + data.height) : null),
-                    card && card.card ? h(AssetCardView, { card: card.card, onPick }) : null,
+                    jsonView
+                      ? h('pre', { className: 'ue-pre ue-raw' }, rawView.loading ? '读取完整属性…' : rawView.text)
+                      : (card && card.card ? h(AssetCardView, { card: card.card, onPick }) : null),
                     data && data.note && !(card && card.card) ? h('div', { className: 'ue-hint' }, data.note) : null,
                     mesh && mesh.animationError ? h('div', { className: 'ue-banner' }, mesh.animationError) : null,
                     json && json.length > 2 && !(card && card.card)
