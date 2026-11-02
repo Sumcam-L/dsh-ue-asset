@@ -134,7 +134,9 @@ powershell -NoProfile -File scripts/install-plugin.ps1 -Apply
 - 17 个工具：`uea_open_game` / `uea_sessions` / `uea_tree` / `uea_find` / `uea_inspect` / `uea_preview` / `uea_export` / `uea_job` / `uea_paks` / `uea_get_tag` / `uea_set_tag` / `uea_asset` / `uea_index` / `uea_animations` / `uea_asset_types` / `uea_search_assets` / `uea_open_asset`
 - 右侧栏 tab：浏览 / 预览，搜索即输即查，可按资产类型筛选
 - 加载包界面：游戏卡片带 exe 图标，会话列表可直接继续或关闭（关闭走 `/close`，正在导出的会话会被拒绝）；PAK 列表支持筛选、chunk 徽章、全选 / 清空 / 默认和一行统计
-- 预览界面顶部常驻「重载 / 复制路径 / 导出」，切换资产会重置内容与滚动位置；没有位图预览的资产显示属性 JSON 并保留重试入口
+- 预览界面顶部常驻「‹ › 后退/前进（80 步历史）/ 重载 / 复制路径 / 导出」，切换资产会重置内容与滚动位置
+- 类型卡片（无位图资产也能看清结构）：数据表（可筛选表格）、材质/材质实例（父链从根编号、贴图槽可点、参数表可过滤）、蓝图（函数、组件、AnimGraph）、动画、静态/骨骼网格（LOD、三角形/顶点数、材质槽、骨骼数、包围盒）、骨架（骨骼与插槽列表）、贴图、音频；卡片右上角可切到完整属性 JSON（带语法高亮）
+- 动画蓝图会按 `FPoseLink.LinkID` 重建节点连线（引脚名、层级都是真的），并给出节点类型分布与状态列表
 - 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框，游戏卡片前缀显示从游戏 exe 资源提取的图标；Oodle 一栏的「下载」按钮会先找本机副本（游戏目录 / FModel / exe 同目录），找不到再下载
 
 Host 用 `ctx.webServer.register` 暴露 `/ue-asset/api/*` 给 Client；没有依赖未公开的 Remote 装饰器。

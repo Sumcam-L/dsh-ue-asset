@@ -36,8 +36,8 @@ public static class AssetAnalyzer
             "data_table" => DataTableCard(root),
             "texture" => TextureCard(provider, objectPath, root, props),
             "anim_sequence" or "anim_montage" or "anim_composite" => AnimCard(root, props),
-            "skeletal_mesh" => MeshCard(root, props, skeletal: true),
-            "static_mesh" => MeshCard(root, props, skeletal: false),
+            "skeletal_mesh" => MeshCard(provider, root, props, skeletal: true),
+            "static_mesh" => MeshCard(provider, root, props, skeletal: false),
             "skeleton" => SkeletonCard(root, props),
             "sound" when className.Contains("SoundWave", StringComparison.OrdinalIgnoreCase)
                       || className.Contains("SoundCue", StringComparison.OrdinalIgnoreCase) => SoundCard(root, props),
@@ -485,21 +485,24 @@ public static class AssetAnalyzer
         };
     }
 
-    private static JObject MeshCard(JObject root, JObject props, bool skeletal)
+    private static JObject MeshCard(IFileProvider provider, JObject root, JObject props, bool skeletal)
     {
-        var slots = props["StaticMaterials"] as JArray ?? props["SkeletalMaterials"] as JArray;
+        // Static meshes keep their slot list in the tagged properties, skeletal meshes at the
+        // export root (FSkeletalMaterial uses "Material" instead of "MaterialInterface").
+        var slots = (props["StaticMaterials"] ?? root["StaticMaterials"]
+                     ?? props["SkeletalMaterials"] ?? root["SkeletalMaterials"]) as JArray;
         var materials = new JArray();
         if (slots is not null)
             foreach (var item in slots.OfType<JObject>())
                 materials.Add(new JObject
                 {
                     ["slot"] = item["MaterialSlotName"]?.ToString() ?? item["ImportedMaterialSlotName"]?.ToString(),
-                    ["path"] = ObjectPathOf(item["MaterialInterface"])
+                    ["path"] = ObjectPathOf(item["MaterialInterface"] ?? item["Material"])
                 });
 
-        // RenderData survives cooking and carries per-LOD sections, so triangle and vertex
-        // counts are derivable even though the mesh itself is not loaded.
-        var lods = root["RenderData"]?["LODs"] as JArray;
+        // LOD sections survive cooking: static meshes under RenderData.LODs, skeletal meshes
+        // under LODModels. Either way the section table carries triangle/vertex counts.
+        var lods = (root["RenderData"]?["LODs"] ?? root["LODModels"]) as JArray;
         long triangles = 0;
         long vertices = 0;
         if (lods is not null)
@@ -510,10 +513,14 @@ public static class AssetAnalyzer
                 foreach (var section in sections.OfType<JObject>())
                 {
                     triangles += section["NumTriangles"]?.ToObject<long?>() ?? 0;
-                    var top = section["MaxVertexIndex"]?.ToObject<int?>() ?? -1;
+                    // Skeletal sections store a base index plus their own vertex count.
+                    var top = section["BaseVertexIndex"]?.ToObject<int?>() is { } baseIndex
+                        ? baseIndex + (section["NumVertices"]?.ToObject<int?>() ?? 0) - 1
+                        : section["MaxVertexIndex"]?.ToObject<int?>() ?? -1;
+                    if (section["MaxVertexIndex"]?.ToObject<int?>() is { } direct && direct > top) top = direct;
                     if (top > maxIndex) maxIndex = top;
                 }
-                vertices += maxIndex + 1;
+                vertices += lod["NumVertices"]?.ToObject<long?>() ?? maxIndex + 1;
             }
 
         var card = new JObject
@@ -529,8 +536,10 @@ public static class AssetAnalyzer
 
         if (skeletal)
         {
+            // The reference skeleton lives in a separate asset, so the mesh only carries a link.
             card["bones"] = (props["BoneTree"] as JArray)?.Count
-                            ?? (root["ReferenceSkeleton"]?["FinalRefBoneInfo"] as JArray)?.Count;
+                            ?? (root["ReferenceSkeleton"]?["FinalRefBoneInfo"] as JArray)?.Count
+                            ?? BoneCountFromSkeleton(provider, props);
             card["sockets"] = Names(props["Sockets"]);
             card["slotGroups"] = new JArray((props["SlotGroups"] as JArray ?? new JArray())
                 .OfType<JObject>()
@@ -538,7 +547,10 @@ public static class AssetAnalyzer
                 .Where(name => !string.IsNullOrWhiteSpace(name)));
         }
 
-        if (props["ExtendedBounds"] is JObject bounds && bounds["BoxExtent"] is JObject extent)
+        // Bounds: skeletal meshes ship them at the export root, static meshes in tagged props.
+        var extent = (root["ImportedBounds"] as JObject)?["BoxExtent"] as JObject
+                     ?? (props["ExtendedBounds"] as JObject)?["BoxExtent"] as JObject;
+        if (extent is not null)
             card["extent"] = new JObject
             {
                 ["x"] = extent["X"]?.ToObject<double?>(),
@@ -547,6 +559,24 @@ public static class AssetAnalyzer
             };
 
         return card;
+    }
+
+    private static int? BoneCountFromSkeleton(IFileProvider provider, JObject props)
+    {
+        var path = TrimIndex(ObjectPathOf(props["Skeleton"]));
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        try
+        {
+            var inspect = ObjectReader.Inspect(provider, path!, "properties", 0, 10);
+            var root = Parse(inspect.PropertiesJson);
+            var bones = root["ReferenceSkeleton"]?["FinalRefBoneInfo"] as JArray
+                        ?? (root["Properties"]?["BoneTree"] as JArray);
+            return bones?.Count;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static JObject SkeletonCard(JObject root, JObject props)
