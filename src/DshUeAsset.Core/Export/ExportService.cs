@@ -12,8 +12,9 @@ public static class ExportService
     /// <summary>
     /// ExportSession.RunAsync(baseDirectory, ...) resolves every output path — including
     /// referenced textures/materials pulled in as dependencies — beneath baseDirectory. That is
-    /// stronger than the post-hoc staging dance older CUE4Parse versions needed, so the job
-    /// directory is both the sandbox and the destination.
+    /// stronger than the post-hoc staging dance older CUE4Parse versions needed, so the export
+    /// root is both the sandbox and the destination. Results land at their package path directly
+    /// under the root: there is no per-job, time-stamped folder between the user and the files.
     /// </summary>
     public static async Task<(IReadOnlyList<ExportFileView> Results, string OutputDirectory)> RunAsync(
         IFileProvider provider,
@@ -27,12 +28,9 @@ public static class ExportService
         if (paths.Count == 0) throw AssetException.Invalid("no asset paths supplied");
         if (paths.Count > maxBatch) throw AssetException.TooLarge($"too many assets in one job: {paths.Count} (max {maxBatch})");
 
-        var jobDirectory = Path.Combine(
-            Path.GetFullPath(outputRoot),
-            "jobs",
-            DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")[..6]);
-        Directory.CreateDirectory(jobDirectory);
-        job.OutputDirectory = jobDirectory;
+        var exportRoot = Path.GetFullPath(outputRoot);
+        Directory.CreateDirectory(exportRoot);
+        job.OutputDirectory = exportRoot;
 
         var results = new List<ExportFileView>();
         var session = new ExportSession
@@ -89,7 +87,7 @@ public static class ExportService
         if (queued == 0)
         {
             job.Completed = job.Total = paths.Count;
-            return (results, jobDirectory);
+            return (results, exportRoot);
         }
 
         job.Total = queued;
@@ -103,7 +101,7 @@ public static class ExportService
             job.UpdatedAt = DateTimeOffset.Now;
         });
 
-        var exported = await session.RunAsync(jobDirectory, BuildOptions(meshFormat), progress, cancellationToken)
+        var exported = await session.RunAsync(exportRoot, BuildOptions(meshFormat), progress, cancellationToken)
             .ConfigureAwait(false);
 
         foreach (var result in exported)
@@ -111,8 +109,8 @@ public static class ExportService
             var files = new List<string>();
             foreach (var diskPath in result.DiskFilePaths ?? [])
             {
-                // Defense in depth: a future CUE4Parse change must not write outside the job dir.
-                var safe = PathPolicy.EnsureWithin(jobDirectory, diskPath);
+                // Defense in depth: a future CUE4Parse change must not write outside the export root.
+                var safe = PathPolicy.EnsureWithin(exportRoot, diskPath);
                 files.Add(safe);
             }
 
@@ -123,7 +121,7 @@ public static class ExportService
                 result.Error?.Message));
         }
 
-        return (results, jobDirectory);
+        return (results, exportRoot);
     }
 
     public static ExportOptions BuildOptions(string? meshFormat)

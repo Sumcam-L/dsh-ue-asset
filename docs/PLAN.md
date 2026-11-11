@@ -205,12 +205,12 @@ PlatformData`，数据本身不可解码。这属于资产内容，不是管线�
 ### 4.4 导出与预览是两条路
 
 ```csharp
-// 导出（用户可见，落在 outputRoot）
+// 导出（用户可见，直接落在 outputRoot；不再套按时间命名的 job 目录）
 var session = new ExportSession { MaxDegreeOfParallelism = 1 };  // provider 非线程安全
 session.Add(uobject);                                            // 依类型自动选 exporter
 
 var results = await session.RunAsync(
-    jobDirectory,
+    outputRoot,
     new ExportOptions(meshFormat: EMeshFormat.UEFormat, textureFormat: ETextureFormat.Png, exportMaterials: true));
 // results: ExportResult { Success, ObjectPath, DiskFilePaths, Error }
 ```
@@ -218,9 +218,10 @@ var results = await session.RunAsync(
 **新版 API 已经解决了路径越界问题。** 旧文档里的 `Exporter.TryWriteToDir` 在
 1.2.2.202610 已不存在；`ExportSession.RunAsync(baseDirectory, ...)` 会在内部用
 `Path.Combine(baseDirectory, savePath)` 解析每个产物，**包括被连带导出的依赖资产**。
-因此 job 目录既是沙箱也是目的地，不需要 staging → 校验 → 再移动那一套。
+因此导出根目录既是沙箱也是目的地，不需要 staging → 校验 → 再移动那一套。
+产物按包内路径直接铺在导出目录下，中间那一层按时间命名的 job 文件夹已经去掉。
 
-仍然保留一次 `PathPolicy.EnsureWithin(jobDirectory, diskPath)` 作为纵深防御。
+仍然保留一次 `PathPolicy.EnsureWithin(outputRoot, diskPath)` 作为纵深防御。
 
 **预览不走上面这条**。面板里的 3D 视口固定用 glTF（three.js 只能读 glTF），导到内部
 缓存目录，用户不可见。UEFormat 是二进制资产格式，`GLTFLoader` 读不了。
@@ -300,7 +301,7 @@ SessionManager (max 4)
 |---|---|
 | 读 | 只允许 `profiles[*].directory` 与其 `extraDirectories` 之下；`Path.GetFullPath` 归一后比对；拒绝 symlink/junction |
 | 密钥 | 只在 config；不进工具参数、不进返回、不进日志 |
-| 写 | 只写 `outputRoot`；每 job 一个 GUID 目录；导出后校验产物路径 |
+| 写 | 只写 `outputRoot`；产物按包内路径直接落在 `outputRoot` 下；导出后校验产物路径 |
 | 资源 | `limits` 五项全部生效 |
 | 网络 | 运行时零出网 |
 

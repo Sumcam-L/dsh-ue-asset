@@ -29,7 +29,7 @@ CUE4Parse (NuGet)  ──►  DshUeAsset.Core  ──►  ueasset CLI / serve
 | 目录浏览 / 路径搜索 | ✅ | `tree` / `find` |
 | 属性读取 | ✅ | 依赖 usmap；缺失时明确报 `parser_error` |
 | 纹理预览 | ✅ | `TextureDecoder` + `TextureEncoder` → PNG |
-| 导出 | ✅ | `ExportSession.RunAsync`，产物约束在 job 目录内 |
+| 导出 | ✅ | `ExportSession.RunAsync`，产物直接落在导出目录内 |
 | serve 协议 | ✅ | JSON-lines，stdin/stdout |
 | DSH Host 工具 | ✅ | 17 个工具，smoke + 全链路测试通过 |
 | DSH 右栏 / 设置页 | ✅ | `sidebar.right.pane.tab` + `settings.section` |
