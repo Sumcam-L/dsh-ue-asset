@@ -90,11 +90,16 @@ function check(label, condition, detail) {
 }
 
 try {
-  check('tools registered', tools.size === 13, [...tools.keys()])
+  check('tools registered', tools.size >= 17, [...tools.keys()])
   check('routes registered', routes.size >= 12, [...routes.keys()])
 
   const ping = await callRoute('/config')
   check('config route', ping.ok === true && Array.isArray(ping.result.profiles), ping)
+
+  // Cache lives under the DSH home now; the stats route must agree with the config view.
+  const cache = await callRoute('/cache/stats')
+  check('cache stats route', cache.ok === true && typeof cache.result.totalBytes === 'number' && typeof cache.result.root === 'string', cache)
+  check('cache root under DSH home', typeof cache.result.root === 'string' && /\.dsh[\\/]dsh-ue-asset[\\/]cache$/i.test(cache.result.root), cache.result.root)
 
   if (ping.result.profiles.length > 0) {
     const catalog = await tools.get('uea_paks').execute({ profile }, {})
@@ -150,7 +155,7 @@ try {
     check('vendor route serves three.js', vendor.status === 200 && vendor.bytes.length > 500_000, { status: vendor.status, bytes: vendor.bytes.length })
 
     const sessions = await tools.get('uea_sessions').execute({ action: 'list' }, {})
-    check('uea_sessions', Array.isArray(sessions) && sessions.length > 0, sessions)
+    check('uea_sessions', Array.isArray(sessions && sessions.sessions) && sessions.sessions.length > 0, sessions)
   } else {
     console.log('skip mount checks: no profiles in config')
   }

@@ -6,31 +6,22 @@ public sealed class AppConfig
 {
     public Dictionary<string, GameProfile> Profiles { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public string? OutputRoot { get; set; }
-    /// <summary>Preview cache + asset index root. Null means %LOCALAPPDATA%/dsh-ue-asset/cache.</summary>
+    /// <summary>Preview cache + asset index root. Null means %DSH_HOME%/dsh-ue-asset/cache.</summary>
     public string? CacheRoot { get; set; }
     public string? OodleLibrary { get; set; }
     public string DefaultMeshFormat { get; set; } = "UEFormat";
     public Limits Limits { get; set; } = new();
     public UiState UiState { get; set; } = new();
 
-    public static string DefaultConfigPath()
-    {
-        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(local, "dsh-ue-asset", "config.json");
-    }
+    public static string DefaultConfigPath() => AppPaths.ConfigPath();
 
     public string ResolveCacheRoot()
     {
         if (!string.IsNullOrWhiteSpace(CacheRoot)) return CacheRoot!;
-        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(local, "dsh-ue-asset", "cache");
+        return AppPaths.CacheRoot();
     }
 
-    public static string DefaultOutputRoot()
-    {
-        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(local, "dsh-ue-asset", "Exports");
-    }
+    public static string DefaultOutputRoot() => AppPaths.OutputRoot();
 }
 
 public sealed class GameProfile

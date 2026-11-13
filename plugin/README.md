@@ -49,7 +49,7 @@ already-published `ueasset.exe`.
         dotnetPath: C:/Program Files/dotnet/dotnet.exe
 ```
 
-Defaults: config from `%LOCALAPPDATA%\dsh-ue-asset\config.json`; the newest
+Defaults: config from `%DSH_HOME%\dsh-ue-asset\config.json` (`%USERPROFILE%\.dsh` when unset); the newest
 `ueasset*.exe` in `<package>/dist` (flat install) or the repo's `dist` (checkout), otherwise
 the Release DLL built by `dotnet build`.
 

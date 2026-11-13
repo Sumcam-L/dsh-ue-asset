@@ -1,4 +1,4 @@
-# Generates %LOCALAPPDATA%\dsh-ue-asset\config.json from FModel's saved AppSettings.json.
+# Generates %DSH_HOME%\dsh-ue-asset\config.json from FModel's saved AppSettings.json.
 # FModel does not need to be running. AES keys are copied into our config and never printed.
 [CmdletBinding()]
 param(
@@ -22,5 +22,6 @@ if ($FmodelSettings) { $args += @('--source', $FmodelSettings) }
 
 dotnet @args
 Write-Host ""
-Write-Host "Config: $(if ($ConfigPath) { $ConfigPath } else { Join-Path $env:LOCALAPPDATA 'dsh-ue-asset/config.json' })"
+$dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
+Write-Host "Config: $(if ($ConfigPath) { $ConfigPath } else { Join-Path $dshHome 'dsh-ue-asset/config.json' })"
 Write-Host "Next: set oodleLibrary in that file, then run: ueasset open <profile>"

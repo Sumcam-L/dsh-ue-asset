@@ -71,8 +71,8 @@ public static class OodleAcquirer
 
     private static string Write(byte[] bytes, string preferredDirectory)
     {
-        var local = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "dsh-ue-asset");
+        // The downloaded runtime is tool state, so it belongs next to the config in the DSH home.
+        var local = AppPaths.DataRoot();
         var directories = new List<string> { preferredDirectory };
         if (!directories.Contains(local, StringComparer.OrdinalIgnoreCase)) directories.Add(local);
 

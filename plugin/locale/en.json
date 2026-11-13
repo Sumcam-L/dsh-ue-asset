@@ -40,5 +40,12 @@
   "type": "Type",
   "close": "Close",
   "reload": "Reload now",
+  "cache": "Cache / index directory",
+  "cacheHint": "Preview GLBs, dependent textures, animation tracks and asset indexes are all rebuilt on demand; clearing loses nothing.",
+  "cacheClear": "Clear cache",
+  "cacheClearing": "Clearing…",
+  "cacheCleared": "Cleared",
+  "cacheEmpty": "Cache is empty",
+  "cacheParts": "Breakdown",
   "loadFailed": "Request failed"
 }

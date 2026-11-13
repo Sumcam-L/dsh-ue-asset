@@ -47,7 +47,7 @@ dotnet src/DshUeAsset.Cli/bin/Release/net10.0/ueasset.dll config import-fmodel
 
 # 3. 补齐 Oodle（解压加密/压缩 PAK 必需）
 #    设置 → UE资产设置 → Oodle 旁的「下载」按钮：优先用本机副本，找不到才从公开镜像下载；
-#    也可以手动编辑 %LOCALAPPDATA%\dsh-ue-asset\config.json → "oodleLibrary"
+#    也可以手动编辑 %DSH_HOME%\dsh-ue-asset\config.json → "oodleLibrary"
 
 # 4. 挂载 + 搜索 + 预览
 ueasset open b1
@@ -59,7 +59,9 @@ CLI 每次调用都是独立进程；需要跨命令复用挂载时用 `serve`�
 
 ## 配置
 
-`%LOCALAPPDATA%\dsh-ue-asset\config.json`，CLI 与插件共用：
+`%DSH_HOME%\dsh-ue-asset\config.json`（`DSH_HOME` 未设时是 `%USERPROFILE%\.dsh`），CLI 与插件共用：
+
+> 从 0.1.9 及更早版本升级时，启动会自动把旧的 `%LOCALAPPDATA%\dsh-ue-asset` 整个搬到这里（配置、缓存、Oodle DLL），只跑一次，旧目录里已存在的同名文件不会被覆盖。
 
 ```json
 {
@@ -137,7 +139,8 @@ powershell -NoProfile -File scripts/install-plugin.ps1 -Apply
 - 预览界面顶部常驻「‹ › 后退/前进（80 步历史）/ 重载 / 复制路径 / 导出」，切换资产会重置内容与滚动位置
 - 类型卡片（无位图资产也能看清结构）：数据表（可筛选表格）、材质/材质实例（父链从根编号、贴图槽可点、参数表可过滤）、蓝图（函数、组件、AnimGraph）、动画、静态/骨骼网格（LOD、三角形/顶点数、材质槽、骨骼数、包围盒）、骨架（骨骼与插槽列表）、贴图、音频；卡片右上角可切到完整属性 JSON（带语法高亮）
 - 动画蓝图会按 `FPoseLink.LinkID` 重建节点连线（引脚名、层级都是真的），并给出节点类型分布与状态列表
-- 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框，游戏卡片前缀显示从游戏 exe 资源提取的图标；Oodle 一栏的「下载」按钮会先找本机副本（游戏目录 / FModel / exe 同目录），找不到再下载
+- 设置 → UE资产设置：游戏、AES、usmap、Oodle、导出目录、缓存目录；引擎版本（EGame）是从解析器枚举自动生成的下拉框，游戏卡片前缀显示从游戏 exe 资源提取的图标；Oodle 一栏的「下载」按钮会先找本机副本（游戏目录 / FModel / exe 同目录），找不到再下载
+- 缓存一栏显示当前占用（总量、文件数、按子目录的明细）和「清理缓存」按钮：清理只删预览 GLB、依赖贴图、动画轨道与资产索引，全部按需重建，不涉及导出产物和配置
 
 Host 用 `ctx.webServer.register` 暴露 `/ue-asset/api/*` 给 Client；没有依赖未公开的 Remote 装饰器。
 
@@ -147,6 +150,10 @@ Host 用 `ctx.webServer.register` 暴露 `/ue-asset/api/*` 给 Client；没有�
 dotnet build DshUeAsset.slnx -c Release
 dotnet test DshUeAsset.slnx -c Release
 node scripts/plugin-smoke.mjs b1
+
+# 缓存占用 / 清理（插件设置页走的是同一条 RPC）
+ueasset cache stats
+ueasset cache clear
 ```
 
 文档：

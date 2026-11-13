@@ -30,10 +30,17 @@ public sealed class AssetService : IDisposable
 
     public AssetService(ConfigStore? store = null)
     {
+        // Move the pre-0.1.10 LOCALAPPDATA tree into the DSH home before anything reads it.
+        // Idempotent and marker-guarded, so this is one stat() on every later launch.
+        LastMigration = AppMigration.Ensure();
+
         _store = store ?? new ConfigStore();
         Config = _store.Load();
         Sessions = new SessionManager(Config);
     }
+
+    /// <summary>Outcome of the startup migration, so the UI can report what moved and where.</summary>
+    public MigrationOutcome LastMigration { get; }
 
     public ConfigStore Store => _store;
 
@@ -59,6 +66,23 @@ public sealed class AssetService : IDisposable
     }
     public AppConfig Config { get; private set; }
     public SessionManager Sessions { get; }
+
+    /// <summary>Size of the internal preview cache, per subtree, for the settings page.</summary>
+    public CacheStatsView CacheStats() => CacheManager.Stats(Config.ResolveCacheRoot());
+
+    /// <summary>
+    /// Deletes every cached preview, texture and asset index. Nothing here is user data: all of it is
+    /// rebuilt on demand, so this is safe to call at any time.
+    /// </summary>
+    public CacheStatsView ClearCache()
+    {
+        var cleared = CacheManager.Clear(Config.ResolveCacheRoot());
+        // Preview results are keyed by hash on disk; the in-memory animation scan cache would
+        // otherwise keep answering with entries whose on-disk half was just deleted.
+        _animationCache.Clear();
+        Directory.CreateDirectory(CacheRoot);
+        return cleared;
+    }
 
     public PakCatalogView ListPaks(string profileName)
     {
@@ -741,9 +765,18 @@ public sealed class AssetService : IDisposable
                 Config.Limits.MaxSessions,
                 Config.Limits.MaxJobs,
                 Config.Limits.MaxBatchAssets,
-                Config.UiState.LastProfile);
+                Config.UiState.LastProfile,
+                ToView(LastMigration));
         }
     }
+
+    private static MigrationView ToView(MigrationOutcome outcome) => new(
+        outcome.Migrated,
+        outcome.From,
+        outcome.To,
+        [.. outcome.Moved],
+        [.. outcome.Skipped],
+        outcome.Reason);
 
     /// <summary>Selectable values of the parser's EGame enum, reflected so the UI never hard-codes them.</summary>
     public IReadOnlyList<GameOption> ListGames() => GameCatalog.All();

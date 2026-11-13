@@ -24,7 +24,17 @@ public sealed record ConfigView(
     int MaxSessions,
     int MaxJobs,
     int MaxBatchAssets,
-    string? LastProfile);
+    string? LastProfile,
+    MigrationView? Migration = null);
+
+/// <summary>What the startup migration did, so the settings page can say so once.</summary>
+public sealed record MigrationView(
+    bool Migrated,
+    string? From,
+    string? To,
+    IReadOnlyList<string> Moved,
+    IReadOnlyList<string> Skipped,
+    string? Reason);
 
 public sealed class ProfileInput
 {

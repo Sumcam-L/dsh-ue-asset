@@ -21,9 +21,19 @@ const API_PREFIX = '/ue-asset/api'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PACKAGE_ROOT = path.resolve(__dirname, '..')
 
+// Everything the plugin owns lives under the DSH home ($DSH_HOME, else ~/.dsh), next to the
+// rest of the harness state -- not under LOCALAPPDATA. The CLI applies the same rule in AppPaths.
+function dshHome() {
+  if (process.env.DSH_HOME) return path.resolve(process.env.DSH_HOME)
+  return path.join(os.homedir(), '.dsh')
+}
+
 function defaultConfigPath() {
-  const local = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
-  return path.join(local, 'dsh-ue-asset', 'config.json')
+  return path.join(dshHome(), 'dsh-ue-asset', 'config.json')
+}
+
+function defaultCacheRoot() {
+  return path.join(dshHome(), 'dsh-ue-asset', 'cache')
 }
 
 // The package ships in two shapes and the binaries sit in a different place in each:
@@ -734,6 +744,8 @@ function registerRoutes(ctx, cli) {
   route('POST', '/config/profile', 'config.saveProfile')
   route('POST', '/config/delete', 'config.deleteProfile')
   route('POST', '/config/import', 'config.importFmodel')
+  route('GET', '/cache/stats', 'cache.stats')
+  route('POST', '/cache/clear', 'cache.clear')
   route('GET', '/config/games', 'config.games')
   route('POST', '/profile-icon', 'profile.icon')
   route('POST', '/oodle/download', 'oodle.acquire')
@@ -798,7 +810,7 @@ function registerRoutes(ctx, cli) {
   let cacheRoot = null
   const getCacheRoot = async () => {
     const config = await cli.call('config.get', {})
-    cacheRoot = config?.cacheRoot || path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'dsh-ue-asset', 'cache')
+    cacheRoot = config?.cacheRoot || defaultCacheRoot()
     return cacheRoot
   }
   ctx.effect(() => ctx.webServer.register({

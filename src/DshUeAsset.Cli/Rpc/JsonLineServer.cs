@@ -115,6 +115,12 @@ public sealed class JsonLineServer
             case "config.importFmodel":
                 return _service.ImportFmodel(Optional(p, "path"));
 
+            case "cache.stats":
+                return _service.CacheStats();
+
+            case "cache.clear":
+                return _service.ClearCache();
+
             case "open":
             {
                 var request = new OpenRequest(

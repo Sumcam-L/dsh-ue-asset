@@ -74,7 +74,20 @@ window.__ModuleLoader__.load({
         type: '类型',
         close: '关闭',
         reload: '立即重载',
-        loadFailed: '请求失败'
+        loadFailed: '请求失败',
+        cache: '缓存 / 索引目录',
+        cacheHint: '预览 GLB、依赖贴图、动画轨道和资产索引用完即可再生，清理不会丢数据。',
+        cacheClear: '清理缓存',
+        cacheClearing: '清理中…',
+        cacheCleared: '已清理',
+        cacheClearedTo: '已清理',
+        cacheEmpty: '缓存为空',
+        cacheParts: '明细',
+        cacheRefresh: '刷新',
+        cacheBusy: '读取中…',
+        cacheFailed: '无法读取缓存信息',
+        cacheMigrated: '配置与缓存已迁移到',
+        migrationTitle: '已从'
       },
       en: {
         title: 'UE Assets',
@@ -137,7 +150,20 @@ window.__ModuleLoader__.load({
         type: 'Type',
         close: 'Close',
         reload: 'Reload now',
-        loadFailed: 'Request failed'
+        loadFailed: 'Request failed',
+        cache: 'Cache / index directory',
+        cacheHint: 'Preview GLBs, dependent textures, animation tracks and asset indexes are rebuilt on demand; clearing loses nothing.',
+        cacheClear: 'Clear cache',
+        cacheClearing: 'Clearing…',
+        cacheCleared: 'Cleared',
+        cacheClearedTo: 'Cleared',
+        cacheEmpty: 'Cache is empty',
+        cacheParts: 'Breakdown',
+        cacheRefresh: 'Refresh',
+        cacheBusy: 'Measuring…',
+        cacheFailed: 'Could not read cache info',
+        cacheMigrated: 'Config and cache moved to',
+        migrationTitle: 'Migrated from'
       }
     };
     const lang = (typeof navigator !== 'undefined' && String(navigator.language || '').toLowerCase().startsWith('en')) ? 'en' : 'zh';
@@ -2191,6 +2217,10 @@ window.__ModuleLoader__.load({
       const [games, setGames] = useState([])
       const [icons, setIcons] = useState({})
       const [oodleBusy, setOodleBusy] = useState(false)
+      const [cacheStats, setCacheStats] = useState(null)
+      const [cacheBusy, setCacheBusy] = useState(false)
+      const [cacheError, setCacheError] = useState(null)
+      const [migration, setMigration] = useState(null)
       const { toast, push } = useToasts()
 
       const loadIcons = async (profiles) => {
@@ -2205,10 +2235,55 @@ window.__ModuleLoader__.load({
         setIcons(Object.fromEntries(entries))
       }
 
+      const formatBytes = (bytes) => {
+        const value = Number(bytes) || 0
+        if (value < 1024) return value + ' B'
+        const units = ['KB', 'MB', 'GB']
+        let scaled = value / 1024
+        let unit = 0
+        while (scaled >= 1024 && unit < units.length - 1) { scaled /= 1024; unit++ }
+        return scaled.toFixed(scaled >= 10 ? 0 : 1) + ' ' + units[unit]
+      }
+
+      const loadCache = async () => {
+        setCacheBusy(true)
+        try {
+          setCacheStats(await api('/cache/stats'))
+          setCacheError(null)
+        } catch (e) {
+          // An older Host without the route (or a dead serve child) must not leave the label
+          // spinning on "loading" forever; say what happened instead.
+          setCacheStats(null)
+          setCacheError(e.message || t('cacheFailed'))
+        } finally {
+          setCacheBusy(false)
+        }
+      }
+
+      // The migration runs once at startup and reports itself through /config; surface it once so
+      // an upgrade never silently relocates somebody's cache.
+      const announceMigration = (cfg) => {
+        const info = cfg && cfg.migration
+        if (!info || !info.migrated) return
+        setMigration(info)
+        push(t('cacheMigrated') + ' ' + (info.to || ''))
+      }
+
+      const clearCache = async () => {
+        setCacheBusy(true)
+        try {
+          const result = await api('/cache/clear', {})
+          push(t('cacheCleared') + ' ' + formatBytes(result && result.totalBytes) + (result && result.root ? ' · ' + result.root : ''))
+          await loadCache()
+        } catch (e) { setError(e.message) } finally { setCacheBusy(false) }
+      }
+
       const load = async () => {
         try {
           const cfg = await api('/config')
           setConfig(cfg)
+          announceMigration(cfg)
+          loadCache()
           loadIcons(cfg.profiles)
           setGlobal({
             outputRoot: cfg.outputRoot || '',
@@ -2355,6 +2430,8 @@ window.__ModuleLoader__.load({
         try {
           const cfg = await api('/config/global', global)
           setConfig(cfg)
+          // Saving may have moved the cache root; the size on screen belongs to the old one.
+          await loadCache()
           push(t('save'))
         } catch (e) { setError(e.message) }
       }
@@ -2510,7 +2587,28 @@ window.__ModuleLoader__.load({
         h('div', { className: 'ue-section' },
           h('h4', null, t('global')),
           h('div', { className: 'ue-field' }, h('label', null, t('outputRoot')), h('input', { value: global.outputRoot, onChange: (event) => setGlobal({ ...global, outputRoot: event.target.value }) })),
-          h('div', { className: 'ue-field' }, h('label', null, '缓存 / 索引目录'), h('input', { value: global.cacheRoot, placeholder: '留空使用默认目录', onChange: (event) => setGlobal({ ...global, cacheRoot: event.target.value }) })),
+          h('div', { className: 'ue-field' }, h('label', null, t('cache')), h('input', { value: global.cacheRoot, placeholder: '留空使用默认目录', onChange: (event) => setGlobal({ ...global, cacheRoot: event.target.value }) })),
+          h('div', { className: 'ue-field' },
+            h('label', null,
+              cacheStats
+                ? formatBytes(cacheStats.totalBytes) + ' · ' + (cacheStats.totalFiles || 0) + ' ' + t('countUnit')
+                : (cacheError ? t('cacheFailed') : t('cacheBusy'))),
+            h('div', { className: 'ue-meta', style: { marginBottom: 4, overflowWrap: 'anywhere' } }, (cacheStats && cacheStats.root) || ''),
+            h('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+              h('button', { className: 'ue-btn', disabled: cacheBusy, onClick: clearCache }, cacheBusy ? t('cacheClearing') : t('cacheClear')),
+              h('button', { className: 'ue-btn', onClick: loadCache }, t('cacheRefresh'))),
+            h('div', { className: 'ue-hint', style: { marginTop: 4 } }, cacheError || t('cacheHint')),
+            cacheStats && cacheStats.parts && cacheStats.parts.length > 0
+              ? h('details', { className: 'ue-fold' },
+                  h('summary', null, h('span', null, t('cacheParts')), h('span', { className: 'ue-fold-count' }, String(cacheStats.parts.length))),
+                  h('div', { className: 'ue-fold-body' },
+                    cacheStats.parts.map((part) => h('div', { key: part.name, className: 'ue-meta', style: { display: 'flex', gap: 6 } },
+                      h('span', { style: { flex: 1, minWidth: 0, overflowWrap: 'anywhere' } }, part.name),
+                      h('span', { style: { flex: 'none' } }, formatBytes(part.bytes) + ' · ' + part.files + ' ' + t('countUnit'))))))
+              : (cacheStats && cacheStats.totalFiles === 0 ? h('div', { className: 'ue-hint' }, t('cacheEmpty')) : null),
+            migration && migration.migrated
+              ? h('div', { className: 'ue-banner' }, t('migrationTitle') + ' ' + (migration.from || '') + ' → ' + (migration.to || '') + (migration.moved && migration.moved.length ? ' (' + migration.moved.length + ' ' + t('countUnit') + ')' : ''))
+              : null),
           h('div', { className: 'ue-field' }, h('label', null, t('oodle')),
             h('div', { style: { display: 'flex', gap: '6px' } },
               h('input', { style: { flex: '1' }, value: global.oodleLibrary, placeholder: '留空自动查找', onChange: (event) => setGlobal({ ...global, oodleLibrary: event.target.value }) }),
@@ -2591,9 +2689,23 @@ window.__ModuleLoader__.load({
       for (const btn of buttons) {
         const text = (btn.textContent || '').trim();
         if (!NAV_LABELS.some((label) => text.indexOf(label) >= 0)) continue;
-        if (btn.querySelector('.' + NAV_MARK_CLASS)) continue;
-        const icon = btn.firstElementChild;
-        if (icon && icon.tagName && icon.tagName.toLowerCase() === 'svg') icon.replaceWith(ueNavMark());
+
+        const marks = [...btn.querySelectorAll('.' + NAV_MARK_CLASS)];
+        // The host re-renders this row, so it can end up with our mark twice; keep one.
+        for (const extra of marks.slice(1)) extra.remove();
+
+        // Target the gear <svg> itself, wherever the host nested it: it may be a direct child, or
+        // wrapped in a span together with the label. Replacing only a direct <svg> is what left the
+        // gear and our mark side by side when the host wrapped it.
+        const gear = btn.querySelector('svg');
+
+        if (marks.length > 0) {
+          // Already marked by this build (or an older one): just drop a leftover gear.
+          gear?.remove();
+          continue;
+        }
+
+        if (gear) gear.replaceWith(ueNavMark());
         else btn.insertBefore(ueNavMark(), btn.firstChild);
       }
     }

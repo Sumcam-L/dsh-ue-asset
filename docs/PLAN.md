@@ -92,7 +92,7 @@ dsh-ue-asset/
 
 ## 3. 配置契约
 
-`%LOCALAPPDATA%\dsh-ue-asset\config.json`——**CLI 与插件共用同一份**。
+`%DSH_HOME%\dsh-ue-asset\config.json`（`DSH_HOME` 未设时 `%USERPROFILE%\.dsh`）——**CLI 与插件共用同一份**。0.1.9 及更早的 `%LOCALAPPDATA%\dsh-ue-asset` 会在启动时自动迁移过来。
 
 ```json
 {
@@ -229,7 +229,7 @@ var results = await session.RunAsync(
 ### 4.5 模型预览与 AI 返图
 
 面板：`MeshPreview` 把 StaticMesh / SkeletalMesh 用 `ExportSession` 以 **Gltf2** 格式
-导成自包含的 `.glb`，落在内部缓存 `%LOCALAPPDATA%\dsh-ue-asset\cache\<hash>\`。
+导成自包含的 `.glb`，落在内部缓存 `%DSH_HOME%\dsh-ue-asset\cache\<hash>\`。
 Host 用 `/ue-asset/cache/*` 前缀路由把缓存目录只读暴露给前端；three.js r128
 （`plugin/vendor/`，不联网）用 `GLTFLoader` + `OrbitControls` 渲染，包围盒自动取景，
 有动画轨道时列出并可播放。

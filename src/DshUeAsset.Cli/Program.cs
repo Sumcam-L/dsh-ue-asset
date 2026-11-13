@@ -116,6 +116,37 @@ try
             return 0;
         }
 
+        case "cache":
+        {
+            var sub = positional.Count > 1 ? positional[1] : "stats";
+            switch (sub)
+            {
+                case "stats":
+                {
+                    var stats = service.CacheStats();
+                    if (Flag("json")) Print(stats);
+                    else
+                    {
+                        Console.WriteLine($"cache {FormatBytes(stats.TotalBytes)}  ({stats.TotalFiles} files)  {stats.Root}");
+                        foreach (var part in stats.Parts)
+                            Console.WriteLine($"  {part.Name,-12} {FormatBytes(part.Bytes),10}  {part.Files,6} files");
+                        if (stats.Error is not null) Console.Error.WriteLine("error: " + stats.Error);
+                    }
+                    return 0;
+                }
+                case "clear":
+                {
+                    var cleared = service.ClearCache();
+                    if (Flag("json")) Print(cleared);
+                    else Console.WriteLine($"cleared {FormatBytes(cleared.TotalBytes)} ({cleared.TotalFiles} files) from {cleared.Root}");
+                    if (cleared.Error is not null) { Console.Error.WriteLine("error: " + cleared.Error); return 1; }
+                    return 0;
+                }
+                default:
+                    throw AssetException.Invalid($"unknown cache subcommand: {sub}");
+            }
+        }
+
         case "doctor":
         {
             var name = positional.Count > 1 ? positional[1] : Opt("profile");
@@ -397,6 +428,15 @@ static string SafeName(string name)
     return new string(chars);
 }
 
+static string FormatBytes(long bytes)
+{
+    string[] units = ["B", "KB", "MB", "GB"];
+    double value = bytes;
+    var unit = 0;
+    while (value >= 1024 && unit < units.Length - 1) { value /= 1024; unit++; }
+    return unit == 0 ? $"{bytes} B" : $"{value:0.#} {units[unit]}";
+}
+
 static void PrintHelp()
 {
     Console.WriteLine(@"ueasset 0.1.0 — local UE4/UE5 asset tool
@@ -415,11 +455,12 @@ Commands:
   mesh <path>                     export a StaticMesh/SkeletalMesh to an internal GLB
   export <path...>                export assets, wait for the job
   job    list|status|cancel [id]  inspect jobs
+  cache  stats|clear              measure or wipe the internal preview cache
   doctor <profile> [asset]        mount diagnostics (pak count, keys, VFS, payload)
   serve                           newline-delimited JSON RPC on stdin/stdout
 
 Common options:
-  --config <path>   config.json (default %LOCALAPPDATA%\dsh-ue-asset\config.json)
+  --config <path>   config.json (default %DSH_HOME%\dsh-ue-asset\config.json)
   --profile <name>  profile to mount for this command
   --dir <path>      ad-hoc paks directory instead of a profile
   --game <EGame>    engine version override, e.g. GAME_BlackMythWukong

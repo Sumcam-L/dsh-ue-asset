@@ -11,7 +11,8 @@ try {
   dotnet publish "src/DshUeAsset.Cli/DshUeAsset.Cli.csproj" -c Dist -r win-x64 --self-contained false -p:PublishSingleFile=true -o $out | Out-Host
 
   if (-not $OodleDll) {
-    $configPath = Join-Path $env:LOCALAPPDATA "dsh-ue-asset/config.json"
+    $dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
+    $configPath = Join-Path $dshHome "dsh-ue-asset/config.json"
     if (Test-Path $configPath) {
       $OodleDll = (Get-Content $configPath -Raw | ConvertFrom-Json).oodleLibrary
     }

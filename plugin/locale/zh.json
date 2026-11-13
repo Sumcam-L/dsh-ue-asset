@@ -40,5 +40,12 @@
   "type": "类型",
   "close": "关闭",
   "reload": "立即重载",
+  "cache": "缓存 / 索引目录",
+  "cacheHint": "预览 GLB、依赖贴图、动画轨道和资产索引用完即可再生，清理不会丢数据。",
+  "cacheClear": "清理缓存",
+  "cacheClearing": "清理中…",
+  "cacheCleared": "已清理",
+  "cacheEmpty": "缓存为空",
+  "cacheParts": "明细",
   "loadFailed": "请求失败"
 }
